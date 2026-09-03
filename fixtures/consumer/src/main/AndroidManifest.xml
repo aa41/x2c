@@ -1,0 +1,26 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".HostApplication"
+        android:appComponentFactory=".DynamicAppComponentFactory"
+        android:allowBackup="false"
+        android:label="X2C JAR Consumer"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <!-- The class is intentionally absent from the host APK classes.dex and lives in codegen-dex.jar. -->
+        <activity
+            android:name="dev.x2c.fixture.producer.DemoActivity"
+            android:exported="false" />
+        <activity
+            android:name="dev.x2c.fixture.secondary.SecondaryActivity"
+            android:exported="false" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

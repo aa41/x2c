@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "assets": [
+    {
+      "name": "product_broken",
+      "url": "https://cdn.example.invalid/x2c/product-broken.jpg",
+      "sha256": "0d6a154f9c62ea721a538d4887a18de145a316d572a93c996b1b8b18e6609785",
+      "mime": "image/jpeg",
+      "bytes": 4377
+    },
+    {
+      "name": "product_hero",
+      "url": "https://img2.baidu.com/it/u=2604349716,1033098650&fm=253&fmt=auto&app=120&f=JPEG?w=500&h=750",
+      "sha256": "567cdec892c6f4a140706350f057fe98fc3871bca7fa1217f8be88c7f5b34b5b",
+      "mime": "image/jpeg",
+      "bytes": 32725
+    }
+  ]
+}

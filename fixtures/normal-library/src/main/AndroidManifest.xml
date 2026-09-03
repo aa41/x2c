@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Merged into the consuming app; the app does not redeclare this Activity. -->
+        <activity
+            android:name=".NormalDemoActivity"
+            android:exported="false" />
+    </application>
+</manifest>

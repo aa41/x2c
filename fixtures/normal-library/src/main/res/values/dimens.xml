@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="normal_page_padding">24dp</dimen>
+    <dimen name="normal_card_padding">20dp</dimen>
+    <dimen name="normal_gap">12dp</dimen>
+    <dimen name="normal_title_size">28sp</dimen>
+</resources>

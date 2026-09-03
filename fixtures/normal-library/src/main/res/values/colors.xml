@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="normal_page">#F4F7FC</color>
+    <color name="normal_surface">#FFFFFFFF</color>
+    <color name="normal_ink">#172033</color>
+    <color name="normal_muted">#667085</color>
+    <color name="normal_primary">#3157D5</color>
+    <color name="normal_primary_pressed">#2344B5</color>
+    <color name="normal_success">#087A55</color>
+</resources>

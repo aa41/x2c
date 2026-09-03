@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "views": [
+    {
+      "tag": "dev.x2c.fixture.producer.widget.ContextBadgeView",
+      "constructor": "CONTEXT"
+    },
+    {
+      "tag": "dev.x2c.fixture.producer.widget.AttrsBadgeView",
+      "constructor": "CONTEXT_ATTRS"
+    },
+    {
+      "tag": "dev.x2c.fixture.producer.widget.LoginInputView",
+      "constructor": "CONTEXT",
+      "attributes": [
+        { "name": "hintText", "setter": "setHintText", "type": "STRING" },
+        { "name": "inputMode", "setter": "setInputMode", "type": "INTEGER" }
+      ]
+    },
+    {
+      "tag": "dev.x2c.fixture.producer.widget.FlowLayout",
+      "constructor": "CONTEXT",
+      "container": {
+        "layoutParamsClass": "dev.x2c.fixture.producer.widget.FlowLayout.LayoutParams",
+        "layoutParamsFactoryClass": "dev.x2c.fixture.producer.widget.FlowLayout.ParamsFactory",
+        "layoutParamsFactoryMethod": "create",
+        "marginLayoutParams": true,
+        "childrenFinishedSetter": "onX2cChildrenReady",
+        "layoutAttributes": [
+          { "name": "layout_columnSpan", "setter": "setColumnSpan", "type": "INTEGER" },
+          { "name": "layout_breakBefore", "setter": "setBreakBefore", "type": "BOOLEAN" },
+          { "name": "layout_itemGravity", "setter": "setItemGravity", "type": "GRAVITY" }
+        ]
+      }
+    },
+    {
+      "tag": "dev.x2c.fixture.producer.widget.StatusPillView",
+      "constructor": "CONTEXT_ATTRS_DEF_STYLE",
+      "attributes": [
+        { "name": "label", "setter": "setLabel", "type": "STRING" },
+        { "name": "accentColor", "setter": "setAccentColor", "type": "COLOR" },
+        { "name": "spacing", "setter": "setSpacingPx", "type": "DIMENSION_INT" },
+        { "name": "emphasized", "setter": "setEmphasized", "type": "BOOLEAN" },
+        { "name": "maxItems", "setter": "setMaxItems", "type": "INTEGER" },
+        { "name": "opacityFactor", "setter": "setOpacityFactor", "type": "FLOAT" },
+        { "name": "panelDrawable", "setter": "setPanelDrawable", "type": "DRAWABLE" },
+        { "name": "heroAsset", "setter": "setHeroAsset", "type": "IMAGE_ASSET" }
+      ]
+    }
+  ]
+}

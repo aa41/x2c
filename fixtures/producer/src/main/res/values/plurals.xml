@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="matrix_cases">
+        <item quantity="one">%1$d 个矩阵用例</item>
+        <item quantity="other">%1$d 个矩阵用例</item>
+    </plurals>
+</resources>

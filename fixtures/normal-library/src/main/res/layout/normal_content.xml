@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/normal_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/normal_page"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/normal_page_padding">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/normal_title"
+            android:textColor="@color/normal_ink"
+            android:textSize="@dimen/normal_title_size"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:lineSpacingMultiplier="1.2"
+            android:text="@string/normal_subtitle"
+            android:textColor="@color/normal_muted"
+            android:textSize="15sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:background="@drawable/normal_card"
+            android:elevation="3dp"
+            android:orientation="vertical"
+            android:padding="@dimen/normal_card_padding">
+
+            <ImageView
+                android:id="@+id/normal_local_image"
+                android:layout_width="match_parent"
+                android:layout_height="260dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="百度测试图片，本地 AAR drawable"
+                android:scaleType="centerCrop"
+                android:src="@drawable/local_product" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="pluginMode=false · HOST_RESOURCE_IDS"
+                android:textColor="@color/normal_success"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/normal_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/normal_gap"
+                android:textColor="@color/normal_muted"
+                android:textIsSelectable="true"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/normal_action_button"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/normal_button"
+            android:text="@string/normal_action"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/normal_close"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="@string/normal_close"
+            android:textColor="@color/normal_primary"
+            android:textSize="15sp" />
+    </LinearLayout>
+</ScrollView>

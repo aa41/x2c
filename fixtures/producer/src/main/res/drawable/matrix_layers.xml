@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:autoMirrored="true"
+    android:paddingMode="stack">
+    <item android:drawable="@drawable/matrix_outline" />
+    <item
+        android:id="@+id/matrix_layer_dot"
+        android:bottom="8dp"
+        android:drawable="@drawable/matrix_oval"
+        android:left="8dp"
+        android:right="8dp"
+        android:top="8dp" />
+</layer-list>

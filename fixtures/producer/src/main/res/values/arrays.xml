@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="login_providers">
+        <item>@string/wechat_login</item>
+        <item>@string/github_login</item>
+        <item>Passkey</item>
+    </string-array>
+    <integer-array name="matrix_steps">
+        <item>10</item>
+        <item>@integer/max_items</item>
+        <item>25</item>
+    </integer-array>
+    <array name="resource_matrix">
+        <item>@string/matrix_title</item>
+        <item>@color/primary</item>
+        <item>@dimen/space_medium</item>
+        <item>@bool/feature_enabled</item>
+        <item>@integer/max_items</item>
+        <item>@fraction/card_width</item>
+    </array>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="secondary_page">#FFF8F4</color>
+    <color name="secondary_surface">#FFFFFFFF</color>
+    <color name="secondary_ink">#FF211B18</color>
+    <color name="secondary_muted">#FF776B65</color>
+    <color name="secondary_line">#FFF0E5DE</color>
+    <color name="secondary_accent">#FFFF5A36</color>
+    <color name="secondary_accent_dark">#FFE64122</color>
+    <color name="secondary_accent_soft">#FFFFE8DF</color>
+    <color name="secondary_gold">#FFFFA726</color>
+    <color name="secondary_success">#FF16865B</color>
+    <color name="secondary_error">#FFD92D20</color>
+    <color name="secondary_dark">#FF2E2521</color>
+</resources>

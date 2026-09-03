@@ -1,0 +1,11 @@
+pluginManagement {
+    repositories {
+        maven { url uri('../../build/compat-maven-cache') }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        mavenLocal()
+    }
+}
+
+rootProject.name = 'x2c-agp-compatibility-fixture'

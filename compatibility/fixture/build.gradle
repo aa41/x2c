@@ -1,0 +1,102 @@
+buildscript {
+    repositories {
+        maven { url uri('../../build/compat-maven-cache') }
+        google()
+        mavenCentral()
+        mavenLocal()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:${findProperty('agpVersion') ?: '3.5.4'}"
+        classpath 'dev.x2c:x2c-gradle-plugin:0.1.0-SNAPSHOT'
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'dev.x2c.codegen'
+
+repositories {
+    maven { url uri('../../build/compat-maven-cache') }
+    google()
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    compileOnly 'dev.x2c:x2c-runtime:0.1.0-SNAPSHOT'
+}
+
+def selectedAgp = (findProperty('agpVersion') ?: '3.5.4').toString()
+def agpMajor = Integer.parseInt(selectedAgp.tokenize('.')[0])
+
+android {
+    compileSdkVersion agpMajor < 7 ? 28 : 36
+    if (agpMajor >= 7) {
+        namespace 'dev.x2c.compatibility'
+    }
+    defaultConfig {
+        minSdkVersion 21
+    }
+}
+
+x2c {
+    pluginMode.set((findProperty('x2cPluginMode') ?: 'true').toBoolean())
+    generatedPackage.set('dev.x2c.compatibility.generated')
+    minApi.set(21)
+}
+
+task verifyGeneratedSourceModel {
+    dependsOn 'compileReleaseJavaWithJavac'
+    doLast {
+        def generated = file("$buildDir/generated/java/x2cGenerateRelease")
+        def javaCompile = tasks.getByName('compileReleaseJavaWithJavac')
+        if (!generated.isDirectory()) {
+            throw new GradleException("Missing generated source directory: $generated")
+        }
+        if (!javaCompile.source.files.any { it.absolutePath.startsWith(generated.absolutePath) }) {
+            throw new GradleException("Generated source directory is absent from JavaCompile sources: $generated")
+        }
+        if (file("$generated/dev/x2c/compatibility/generated/X2C.java").exists()) {
+            throw new GradleException('Generated X2C.java must not duplicate the host runtime facade')
+        }
+        if (!file("$generated/dev/x2c/compatibility/generated/X2cModule.java").isFile()) {
+            throw new GradleException('X2cModule.java was not generated')
+        }
+        if (!file("$generated/dev/x2c/compatibility/generated/X2cResourceProviderImpl.java").isFile()) {
+            throw new GradleException('Runtime resource provider was not generated')
+        }
+        if (!file("$generated/dev/x2c/compatibility/x2c/X2cModuleBootstrap.java").isFile()) {
+            throw new GradleException('Automatic module bootstrap was not generated from the Android namespace')
+        }
+        def r2Source = file("$generated/dev/x2c/compatibility/generated/R2.java").text
+        def pluginMode = (findProperty('x2cPluginMode') ?: 'true').toBoolean()
+        if (pluginMode && r2Source.contains('getIdentifier(')) {
+            throw new GradleException('Plugin mode R2 must use synthetic constants')
+        }
+        if (!pluginMode && !r2Source.contains('context.getResources().getIdentifier(resName, resType, context.getPackageName())')) {
+            throw new GradleException('Normal integration R2 must bind IDs through host Resources#getIdentifier')
+        }
+        if (!file("$buildDir/outputs/x2c/release/codegen.jar").isFile()) {
+            throw new GradleException('codegen.jar was not generated')
+        }
+        if (file("$buildDir/generated/sources/x2c").exists()) {
+            throw new GradleException('Obsolete duplicate generated/sources/x2c directory still exists')
+        }
+        def codegenJar = new java.util.jar.JarFile(file("$buildDir/outputs/x2c/release/codegen.jar"))
+        try {
+            def entries = java.util.Collections.list(codegenJar.entries())
+            if (entries.any { !it.directory && !it.name.endsWith('.class') }) {
+                throw new GradleException('codegen.jar contains a non-class entry')
+            }
+            if (entries.any { it.name ==~ /(?:.*\/)?R(?:\$.*)?\.class/ }) {
+                throw new GradleException('codegen.jar contains an Android R class')
+            }
+            if (!entries.any { it.name == 'dev/x2c/compatibility/x2c/X2cModuleBootstrap.class' }) {
+                throw new GradleException('codegen.jar does not contain the automatic module bootstrap')
+            }
+        } finally {
+            codegenJar.close()
+        }
+    }
+}
+
+verifyGeneratedSourceModel.dependsOn 'x2cReleaseJar'
