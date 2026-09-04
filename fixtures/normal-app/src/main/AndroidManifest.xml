@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
+        android:name=".NormalApplication"
         android:allowBackup="false"
         android:label="X2C Normal AAR Consumer"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">

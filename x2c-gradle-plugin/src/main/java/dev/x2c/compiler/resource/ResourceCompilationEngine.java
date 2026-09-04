@@ -35,50 +35,6 @@ public final class ResourceCompilationEngine {
     public void compile(
             List<File> resourceRoots,
             String generatedPackage,
-            File assetLockFile,
-            File sourceOutput,
-            File reportOutput) throws IOException {
-        compile(resourceRoots, generatedPackage, assetLockFile, null, sourceOutput, reportOutput);
-    }
-
-    public void compile(
-            List<File> resourceRoots,
-            String generatedPackage,
-            File assetLockFile,
-            File customViewsFile,
-            File sourceOutput,
-            File reportOutput) throws IOException {
-        compile(resourceRoots, generatedPackage, assetLockFile, customViewsFile, 21, sourceOutput, reportOutput);
-    }
-
-    public void compile(
-            List<File> resourceRoots,
-            String generatedPackage,
-            File assetLockFile,
-            File customViewsFile,
-            int minApi,
-            File sourceOutput,
-            File reportOutput) throws IOException {
-        compile(resourceRoots, generatedPackage, assetLockFile, customViewsFile, minApi, true,
-                sourceOutput, reportOutput);
-    }
-
-    public void compile(
-            List<File> resourceRoots,
-            String generatedPackage,
-            File assetLockFile,
-            File customViewsFile,
-            int minApi,
-            boolean pluginMode,
-            File sourceOutput,
-            File reportOutput) throws IOException {
-        compile(resourceRoots, generatedPackage, inferredNamespace(generatedPackage), assetLockFile,
-                customViewsFile, minApi, pluginMode, sourceOutput, reportOutput);
-    }
-
-    public void compile(
-            List<File> resourceRoots,
-            String generatedPackage,
             String moduleNamespace,
             File assetLockFile,
             File customViewsFile,
@@ -140,32 +96,4 @@ public final class ResourceCompilationEngine {
                 lockedAssets, pluginMode);
         writeReport(reportOutput.toPath(), generatedPackage, files, model, lockedAssets, pluginMode);
     }
-
-    private static String inferredNamespace(String generatedPackage) {
-        if (generatedPackage.endsWith(".generated")) {
-            return generatedPackage.substring(0, generatedPackage.length() - ".generated".length());
-        }
-        if (generatedPackage.endsWith(".x2c")) {
-            return generatedPackage.substring(0, generatedPackage.length() - ".x2c".length());
-        }
-        return generatedPackage;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }

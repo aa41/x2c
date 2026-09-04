@@ -91,10 +91,13 @@ final class LayoutResourceParser {
                     if (parent == null || isAllowedFrameworkLayoutAttribute(parent.tag, name)
                             || (parent.container() != null && (name.equals("layout_width") || name.equals("layout_height")
                             || (name.startsWith("layout_margin") && parent.container().marginLayoutParams())))) {
-                        node.attributes.put(name, attribute.getNodeValue());
+                        node.attributes.put(name, normalizedAttributeValue(
+                                file, name, attribute.getNodeValue(), null));
                     } else if (parentLayoutAttribute != null) {
                         node.layoutAttributes.put(name, new CustomAttributeValue(
-                                parentLayoutAttribute, attribute.getNodeValue()));
+                                parentLayoutAttribute, normalizedAttributeValue(
+                                        file, name, attribute.getNodeValue(),
+                                        parentLayoutAttribute)));
                     } else {
                         throw fail(file, "Unsupported LayoutParams attribute for parent " + parent.tag
                                 + ": android:" + name);
@@ -104,12 +107,14 @@ final class LayoutResourceParser {
                 if (!isAllowedLayoutAttribute(node, name)) {
                     throw fail(file, "Unsupported " + resolvedTag + " attribute: android:" + name);
                 }
-                node.attributes.put(name, attribute.getNodeValue());
+                node.attributes.put(name, normalizedAttributeValue(
+                        file, name, attribute.getNodeValue(), null));
                 continue;
             }
             if (parentLayoutAttribute != null) {
                 node.layoutAttributes.put(name, new CustomAttributeValue(
-                        parentLayoutAttribute, attribute.getNodeValue()));
+                        parentLayoutAttribute, normalizedAttributeValue(
+                                file, name, attribute.getNodeValue(), parentLayoutAttribute)));
                 continue;
             }
             if (name != null && name.startsWith("layout_") && parent != null && parent.container() != null) {
@@ -120,7 +125,9 @@ final class LayoutResourceParser {
             if (customAttribute == null) {
                 throw fail(file, "Unsupported custom attribute on " + resolvedTag + ": " + attribute.getNodeName());
             }
-            node.customAttributes.put(name, new CustomAttributeValue(customAttribute, attribute.getNodeValue()));
+            node.customAttributes.put(name, new CustomAttributeValue(
+                    customAttribute, normalizedAttributeValue(
+                            file, name, attribute.getNodeValue(), customAttribute)));
         }
         requireAttribute(file, element, "layout_width");
         requireAttribute(file, element, "layout_height");
@@ -143,6 +150,21 @@ final class LayoutResourceParser {
             throw fail(file, resolvedTag + " can contain only one direct child");
         }
         return node;
+    }
+
+    private static String normalizedAttributeValue(
+            File file,
+            String name,
+            String value,
+            CustomViewRegistry.AttributeSpec customAttribute) {
+        if (customAttribute != null && "STRING".equals(customAttribute.type())) {
+            return decodeAndroidText(file, value);
+        }
+        if (setOf("text", "hint", "contentDescription", "tag", "tooltipText",
+                "transitionName").contains(name)) {
+            return decodeAndroidText(file, value);
+        }
+        return value;
     }
 
     static boolean isContainer(LayoutNode node) {

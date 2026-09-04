@@ -20,18 +20,19 @@
 
 新增资源类型时应先扩展 model，再分别增加 parser 和 generator；新增 framework View/属性只修改 registry 与对应 emitter。不要让 parser 直接写源码，也不要让 generator 重新读取 XML。包级依赖约束同时记录在 `resource/package-info.java`。
 
-## 两种 JAR
+## 三种构建产物
 
 | 产物 | 内容 | 用途 |
 |---|---|---|
 | `codegen.jar` | JVM `.class` | 作为 Android/JVM 构建依赖；Android 构建时由 D8 转为 DEX |
+| `activity-plugin.jar` | 父类/callsite 已转换的 JVM `.class` | Android 插件组件的 D8 输入与静态审计产物 |
 | `codegen-dex.jar` | 单个 `classes.dex` | Android 运行时通过 `DexClassLoader` 加载 |
 
 普通 class JAR 不能被 Android Runtime 直接执行。Android 的 `DexClassLoader` 需要 DEX，因此插件单独提供 D8 任务。两种产物都不包含 `res/`、`assets/`、Android Manifest 或 resource table。
 
 ## 当前支持
 
-- 双 ID 模式：plugin 模式生成稳定 synthetic R2；normal 模式通过宿主 `Resources#getIdentifier` 绑定真实资源 ID
+- 双 ID 模式：plugin 模式生成稳定 synthetic R2；normal 模式由模块 Provider 按名称解析并缓存宿主真实资源 ID
 - 完整 R2 namespace：覆盖当前编译器支持的 `id/layout/string/color/drawable/dimen/bool/integer/array/plurals/fraction`，不再生成重复的 `X2cIds`
 - values: `string`、literal `color`、`bool`、`integer`、`dimen`、`fraction`、`string-array`、`integer-array`、typed `array`、`plurals` 数据和 `<item type="id">`
 - color: `res/color` selector（完整状态集合、alpha、default-last）生成 `ColorStateList`
@@ -45,6 +46,9 @@
 - 确定性 class JAR: 固定 entry 顺序和时间戳，只收集当前 variant 的 Java/Kotlin/Scala project `.class`
 - class contract verifier: plugin 模式拒绝业务 bytecode 中的非系统 `R`/`R$*`、`TypedArray/styleable` 和动态资源查询；normal 模式允许 `Resources.getIdentifier` 以支持宿主资源绑定，其余约束保持
 - 可选 DEX JAR: 使用 Android SDK D8 生成 `classes.dex`
+- 插件组件公共根：`x2c-plugin-base` 由宿主唯一持有；业务 `BaseActivity` 可用
+  `@X2cPluginBase` 从 `compileOnly project` 精确复制为插件私有闭包，再由 ASM 改写
+- 组件代理：四种 Activity launchMode、started/bound Service、normal/ordered Receiver、虚拟 ContentProvider 安全子集
 
 通用 View 属性覆盖：ID、宽高、weight、gravity、margin、padding、background/tint/foreground、visibility、enabled/click/focus/state、content description/tag/tooltip/transition、alpha/elevation/rotation/scale/translation/min size、layout direction、over-scroll 和常用 accessibility 属性。TextView 家族增加文本、hint、行数、字体样式、ellipsize、inputType/IME；ImageView 家族增加 src/scale/tint；CompoundButton、ProgressBar/SeekBar/RatingBar 也有对应 typed setter。
 
@@ -62,11 +66,16 @@ framework 静态 children 容器覆盖 `LinearLayout`、`FrameLayout`、`Relativ
 plugins {
     id("com.android.library") version "8.11.1"
     id("dev.x2c.codegen") version "0.1.0-SNAPSHOT"
+    id("dev.x2c.activity-plugin") version "0.1.0-SNAPSHOT"
 }
 
 dependencies {
     // 动态 plugin library 不把 runtime 打入 payload；宿主使用 implementation。
     compileOnly("dev.x2c:x2c-runtime:0.1.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-plugin-runtime:0.1.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-plugin-base:0.1.0-SNAPSHOT")
+    // 可选：较大业务 project 无需拆 module；只复制被入口继承且标注的 base 闭包。
+    compileOnly(project(":business-base"))
 }
 
 android {
@@ -76,10 +85,21 @@ android {
 
 x2c {
     pluginMode.set(true)
+    // 服务端 catalog 和宿主安装时使用的稳定身份；同时安装的插件必须唯一。
+    pluginId.set("com.example.library")
     generatedPackage.set("com.example.library.generated")
     assetLockFile.set(layout.projectDirectory.file("x2c-assets.lock.json"))
     customViewsFile.set(layout.projectDirectory.file("x2c-custom-views.json"))
     minApi.set(21)
+}
+```
+
+组件配置只有这一份 `x2c {}` DSL；`pluginId` 已直接合入其中，不再创建或识别
+`x2cActivity {}`。业务 base project 只需额外以 `compileOnly` 获得 marker annotation：
+
+```kotlin
+dependencies {
+    compileOnly("dev.x2c:x2c-plugin-api:0.1.0-SNAPSHOT")
 }
 ```
 
@@ -88,20 +108,52 @@ x2c {
 ```kotlin
 dependencies {
     implementation("dev.x2c:x2c-runtime:0.1.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-plugin-loader:0.1.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-plugin-runtime:0.1.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-plugin-base:0.1.0-SNAPSHOT")
 }
 ```
 
+`BasePluginActivity/BasePluginService` 是插件 delegate 专用的宿主持有根，不是原生宿主组件的普通
+framework 基类。原生宿主 Activity 不能继承 `BasePluginActivity`；两端需要复用的业务逻辑应放在
+不依赖 Activity 身份的 controller/helper，再由各自的薄 base 调用。完整边界见
+[Android 插件组件协议](docs/PLUGIN_COMPONENTS.md)。
+
+插件源码并非必须直接继承 `BasePluginActivity`。在业务 base project 中给 Activity 根添加
+`@X2cPluginBase`，并让插件以 `compileOnly(project(":business-base"))` 编译；组件插件会从 compile classpath
+中只选择实际出现在插件 Activity 父类链上的标注根、其父类以及同一 artifact 内可由字节码确定的 class
+依赖，复制进 payload 后统一转换。反射专用依赖可通过 `@X2cPluginBase(include = {...})` 显式补充。
+因此同一份 library 可以由宿主 `implementation` 得到普通 `BusinessBaseActivity -> Activity`，插件则把
+私有副本改为 `BusinessBaseActivity -> PluginActivity`。无需把业务 project 拆成只有一个 Activity 的 module；
+未被闭包引用的业务 class 不会进入 payload。两份 class 的 identity、static 字段和单例仍然隔离。
+
+第一阶段会拒绝选中闭包中的 Android resources API、`R`/`TypedArray`、JNI、重复 class、宿主 X2C runtime
+副本以及 AndroidX/AppCompat/Material。未标 `@X2cPluginBase`、因而只存在于宿主 ClassLoader 的普通
+BaseActivity 仍不能作为插件父类；平台和 X2C runtime/API/base/loader 继续 parent-first。每个依赖 class 集的 SHA-256、
+数量和 ownership 会进入组件构建报告，最终签名 descriptor 的 payload SHA-256 会覆盖转换后的完整闭包。
+
 ### 两种资源 ID 模式
 
-| 配置 | R2 字段 | 资源边界 | 适用场景 |
+| 配置 | R2 形态 | 资源边界 | 适用场景 |
 |---|---|---|---|
 | `pluginMode=true`（默认） | 编译期 `public static final int` synthetic ID | JAR/DEX JAR 不依赖宿主 resource table | 动态插件、纯 class payload |
-| `pluginMode=false` | `X2cModule.init(context)` 时通过 `context.getResources().getIdentifier(name, type, context.getPackageName())` 赋值 | 原始资源必须正常合并进宿主 | 普通 Android library 集成 |
+| `pluginMode=false` | 无状态查询方法，例如 `R2.id.title(context)`；内部委托模块 Provider | 原始资源必须正常合并进宿主 | 普通 Android library 集成 |
 
-normal 模式的 R2 字段不是 Java compile-time constant，因此可用于 `findViewById`、`getString`、等值比较，
-但不能用于 `case R2...` 或要求编译期常量的 annotation。生成布局的分发已经改为 runtime registry，不依赖
-`switch`，所以两种模式都可工作。任何 `getIdentifier()` 返回 0 的资源都会在初始化时抛
-`Resources.NotFoundException`，不会把无效 ID 继续传递。
+完整的命令行切换、依赖/Manifest 检查表和回归命令见
+[pluginMode 安全切换指南](docs/PLUGIN_MODE.md)。
+
+两项误操作会被硬性拒绝：`pluginMode=false` 不能保留 `dev.x2c.activity-plugin`，也不能执行
+`x2c<Variant>Jar`/`x2c<Variant>DexJar`。动态组件插件同一 `pluginId` 在进程内只允许安装一次；热卸载和同进程替换因无法
+证明所有 framework 生命周期均已结束而 fail closed，升级必须在新进程中完成。
+
+normal 模式不再生成静态可变 ID 字段，也没有 `R2.init()`。`X2cResourceProviderImpl` 是唯一宿主 ID
+解析入口：它先校验当前模块的资源名称白名单，再按需调用一次
+`Resources#getIdentifier()` 并缓存结果。多个 Activity 共享同一宿主 resource table 和模块 Provider，
+不会互相覆盖 ID。兼容代码可写 `findViewById(R2.id.title(activity))`，但业务推荐直接使用
+`resources.id("title")` 或 `resources.requireView(root, "title", TextView.class)`，从而完全不依赖 generated 包。
+normal ID 仍不是 Java compile-time constant，不能用于 `switch case` 或 annotation；查询结果为 0 时抛
+`Resources.NotFoundException`。R2 查询只在首次访问时进入模块初始化锁；初始化完成后通过 volatile 快路径
+直接访问 Provider，已缓存的资源 ID 查询同样不再加锁。
 
 Gradle 插件会在 Android namespace 下生成 `x2c.X2cModuleBootstrap`。宿主已经加载插件入口类后，
 runtime 会沿入口类包路径找到 bootstrap、初始化内部 `X2cModule` 并返回不暴露模块名称的句柄：
@@ -114,7 +166,20 @@ X2cResources resources = X2C.loadModule(applicationContext, pluginEntry);
 bootstrap 必须和业务 anchor 来自同一个 ClassLoader，避免 plugin loader miss 后错误认领宿主模块。
 插件业务代码直接使用 `X2C.resources(MyPluginClass.class)`，无需声明 module name 或引用 generated 类。
 
-普通 AAR 不需要插件安装器。传入 Context 和任意 library 业务类即可从应用 ClassLoader 按需初始化：
+普通 AAR 不需要插件安装器，但宿主仍应在 `Application` 中只初始化一次 runtime；之后传入 Context 和
+任意 library 业务类即可从应用 ClassLoader 按需初始化对应 module：
+
+```java
+@Override protected void attachBaseContext(Context base) {
+    super.attachBaseContext(base);
+    X2C.init(base);
+}
+```
+
+如果插件不在 `attachBaseContext` 安装，也可以放在 `Application.onCreate`；关键是必须早于第一次 X2C
+资源访问或插件 ClassLoader 创建。loader、generated bootstrap、Activity 和每次资源查询都不再重复调用
+`X2C.init`。每个 generated module 仍会在首次装载时注册一次自己的 Provider/Layout，这与进程级初始化
+是两个不同生命周期。
 
 ```java
 X2cResources resources = X2C.resources(activity, MyLibraryActivity.class);
@@ -132,6 +197,9 @@ x2cGenerateRelease  -> build/generated/java/x2cGenerateRelease/
                     -> build/reports/x2c/release/report.json
                     -> build/reports/x2c/release/assets-candidates.json
 x2cReleaseJar       -> build/outputs/x2c/release/codegen.jar
+x2cTransformReleaseActivities
+                    -> build/outputs/x2c/release/activity-plugin.jar
+                    -> build/reports/x2c/release/activities.json
 x2cReleaseDexJar    -> build/outputs/x2c/release/codegen-dex.jar
 ```
 
@@ -158,7 +226,7 @@ Android Studio 只索引当前选中的 Build Variant。若选择 debug，跳转
 
 | AGP | Gradle/JDK | 结果 |
 |---|---|---|
-| 3.5.4 | Gradle 5.4.1 / JDK 8 | generated source、JavaCompile、R2/runtime 引用、class JAR 通过 |
+| 3.5.4 | Gradle 5.4.1 / JDK 8 | generated source、JavaCompile、R2/runtime、Activity transform/registry、class/DEX JAR 通过 |
 | 4.1.3 | Gradle 6.5 / JDK 8 | 同上 |
 | 7.3.1、7.4.2 | Gradle 7.5 / JDK 11 | 同上 |
 | 8.0.1、8.1.0 | Gradle 8.2.1 / JDK 17+ | 同上 |
@@ -168,6 +236,8 @@ Android Studio 只索引当前选中的 Build Variant。若选择 debug，跳转
 3.5.x–8.x 使用同一条公共 API 契约，不依赖仅在新 AGP 存在的 `androidComponents`/`ScopedArtifacts`
 类，避免插件在旧 AGP 启动时发生 `NoClassDefFoundError`。AGP 3.x 会把 Android `R.class` 编入 Javac
 目录，打 JAR 时会显式过滤它，并继续扫描所有保留 class 对 `R/TypedArray` 等资源运行时 API 的引用。
+DEX 任务会读取各 Build Tools `d8.jar` 的 classfile 版本，选择当前 Gradle JVM 能执行的最新 D8，避免
+JDK 8/11 工程误选只支持更高 Java 版本的新版 D8。
 
 插件不再全局关闭 AGP resource pipeline，因为 normal 模式必须把资源合并到宿主。跨全部版本保证物理上
 不含资源的是 `x2c<Variant>Jar` 与 `x2c<Variant>DexJar`；plugin 模式使用它们作为发布物，normal 模式则
@@ -183,7 +253,8 @@ X2C_OFFLINE=true ./scripts/verify-agp-compatibility.sh
 
 每个 `res/layout/*.xml` 都会同时生成：
 
-- `R2.layout.<name>`：plugin 模式为稳定 synthetic ID，normal 模式为宿主真实 layout ID。
+- R2 layout：plugin 模式生成 `R2.layout.<name>` 稳定常量；normal 模式生成可选兼容方法
+  `R2.layout.<name>(context)`，并由 Provider 返回宿主真实 layout ID。
 - `X2cLayouts.<name>(context)`：单布局的底层 factory。
 - `X2cResourceProviderImpl`：把 R2、values、drawable 等内部实现适配到 runtime 中间层。
 - `X2cModule`：注册 provider、CDN 图片元数据和全部 layout factory。
@@ -210,15 +281,16 @@ int accent = x2c.color("accent");
 
 与原版 X2C 一致，三参数 `inflate(context, layoutId, parent)` 在 `parent != null` 时默认 attach。由于本项目的目标产物不包含 XML、resource table 或 `res/`，未知 layout ID 会明确抛出异常，不会回退到 `LayoutInflater.inflate(resourceId)`。
 
-`dev.x2c.runtime.X2C` 是宿主唯一 runtime。新业务不得依赖 generated R2；`R2` 只服务生成实现，
-此前重复的 generated `X2C` 门面和 `X2cIds` 均已移除。
+`dev.x2c.runtime.X2C` 是宿主唯一 runtime。新业务不得依赖 generated R2；plugin R2 服务生成实现，
+normal R2 只保留无状态兼容查询门面。此前重复的 generated `X2C` 门面和 `X2cIds` 均已移除。
 
 `X2cResourceProviderImpl` 仍然必要：它保存当前模块的资源名称白名单，以及“名称 → 编译后 Java
 value/drawable”分发表。plugin 模式的 `getIdentifier()` 返回 generated `R2` synthetic ID；normal 模式先用
-生成白名单阻止越权查询，再直接调用宿主
-`context.getResources().getIdentifier(name, type, context.getPackageName())`，返回 0 时抛
-`Resources.NotFoundException`。normal `R2.init()` 仍需绑定生成布局和 View ID，因此 Provider 不能整体移到
-runtime；runtime 并不知道每个模块声明过哪些名称，也不能为无 resource table 的 plugin 模式合成 ID。
+生成白名单阻止越权查询，再按资源名称首次访问时调用宿主
+`context.getResources().getIdentifier(name, type, context.getPackageName())`，结果缓存在模块 Provider 中，
+返回 0 时抛 `Resources.NotFoundException`。`R2.init()` 已删除，生成布局、normal R2 兼容方法和业务
+`X2cResources` 都收敛到同一个 Provider。Provider 仍不能整体移到 runtime：runtime 不知道每个模块声明过
+哪些名称，也不能为无 resource table 的 plugin 模式合成 ID 或持有模块专属 value/drawable 分发表。
 通用数组、文本、像素换算和 optional lookup 继续由 `X2cResourceProvider` default method 复用。
 
 这些 API 只覆盖编译器声明支持的资源子集。`openRawResource`、`getXml/getLayout` 返回 XML parser、
@@ -317,7 +389,8 @@ fixture 的无依赖 HTTP loader 会验证最终 HTTPS、HTTP/MIME、精确字�
 ## ClassLoader
 
 完整的 library + 动态宿主 app demo 见 [fixtures/README.md](fixtures/README.md)。宿主没有静态依赖
-producer JAR，但静态依赖轻量的 `x2c-runtime` JAR。`X2C.init(context)` 固定宿主 Context/ClassLoader；
+producer JAR，但静态依赖轻量的 `x2c-runtime` JAR。`X2C.init(context)` 在宿主 `Application` 中执行一次，
+固定宿主 Context/ClassLoader；
 `PluginClassLoader` 对业务及第三方类 plugin-first，找不到时回退宿主，对 Android/Java/X2C runtime 类
 强制 parent-first，避免 runtime 单例、resource provider 接口和图片 SPI 被插件重复加载。宿主使用
 `X2C.loadModule(context, pluginEntryClass)` 后，runtime 自动发现 bootstrap，并按 provider 的实际 ClassLoader 建立模块映射；
@@ -325,13 +398,25 @@ producer JAR，但静态依赖轻量的 `x2c-runtime` JAR。`X2C.init(context)` 
 layout 名称和图片仍在 runtime 内部按生成 moduleName 隔离，业务无需读取或传递它；即使两个模块出现相同
 synthetic layoutId，也能通过各自的 `X2cResources` 句柄共存。旧 int-only API 在 ID 有歧义时会明确失败，重复 moduleName 会在注册时
 直接报错，避免后加载 JAR 静默覆盖先加载 JAR。
-插件 Activity 再通过自身 class 取回 `X2cResources`。DEX JAR 经摘要校验后复制到私有目录，Activity 仍由
-`AppComponentFactory` 路由实例化。外部动态下载代码必须增加独立签名校验并遵守应用商店政策。
+插件组件层由构建期 ASM 改写 Activity、普通 Service、显式 BroadcastReceiver、非导出 ContentProvider，
+并生成 direct-constructor `ComponentRegistry`；同一 payload JAR 内可保留多层自定义 BaseActivity/BaseService，
+transform 只替换继承链最底的 framework 锚点。宿主使用固定非导出 Manifest 容器，不声明具体插件组件，
+也不替换 `AppComponentFactory`。Provider URI/ContentResolver 调用在构建期显式虚拟化，不支持的 caller identity
+或 ProviderClient API 会 fail closed。服务端 DEX 安装使用 RSA 签名 descriptor、payload SHA-256、私有只读
+文件和 versionCode 防降级。完整设计、API 边界与 Google Play 风险见
+[docs/ACTIVITY_PLUGIN.md](docs/ACTIVITY_PLUGIN.md) 和
+[docs/PLUGIN_COMPONENTS.md](docs/PLUGIN_COMPONENTS.md)。
 
 ## 验证
 
 ```bash
 ./scripts/verify.sh
+# 同时验证 true/false 正向产物与错误组合 fail-closed
+./scripts/verify-plugin-modes.sh
+# AGP 3.5.4 到 8.13.1 代表版本矩阵
+X2C_OFFLINE=true ./scripts/verify-agp-compatibility.sh
+# 有连接的 Android 设备时，执行完整 Activity 路由与 Result/onNewIntent 验证
+./scripts/verify-plugin-showcases.sh
 ```
 
-fixture 验证真实 values/layout/custom ViewGroup/shape/selector/JPEG lock、JVM 内部类与逻辑代码经由插件生成 class-only JAR 和 DEX JAR；consumer 不静态依赖 producer class，而是把两个 DEX JAR 作为独立动态 payload 加载并跳转到登录、电商 Activity。normal fixture 同时验证同一 JPEG 作为 AAR 本地 drawable。当前实测结果与边界见 [docs/FEASIBILITY.md](docs/FEASIBILITY.md)。
+fixture 的对外能力展厅与交互矩阵验证真实 values/layout/custom ViewGroup/shape/selector/JPEG lock、JVM 内部类与逻辑代码经由插件生成 class-only JAR 和 DEX JAR；consumer 不静态依赖 producer class，而是把两个 DEX JAR 作为独立动态 payload 加载，并验证宿主→插件、同插件、跨插件、Result、singleTop/onNewIntent、插件→宿主以及 BaseActivity 构造/attach/lifecycle `super` 链。normal fixture 同时验证同一 JPEG 作为 AAR 本地 drawable。当前实测结果与边界见 [docs/FEASIBILITY.md](docs/FEASIBILITY.md)。

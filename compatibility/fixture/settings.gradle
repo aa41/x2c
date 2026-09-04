@@ -9,3 +9,4 @@ pluginManagement {
 }
 
 rootProject.name = 'x2c-agp-compatibility-fixture'
+include ':business-base'

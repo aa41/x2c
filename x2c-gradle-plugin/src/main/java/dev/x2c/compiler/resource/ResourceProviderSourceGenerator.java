@@ -18,12 +18,15 @@ final class ResourceProviderSourceGenerator {
         out.line("import dev.x2c.runtime.X2cResourceProvider;");
         if (!pluginMode) {
             out.line("import java.util.Objects;");
+            out.line("import java.util.concurrent.ConcurrentHashMap;");
+            out.line("import java.util.concurrent.ConcurrentMap;");
         }
         out.blank();
         out.open("final class X2cResourceProviderImpl implements X2cResourceProvider");
 
         if (!pluginMode) {
             out.line("private final Context context;");
+            out.line("private final ConcurrentMap<String, Integer> identifiers = new ConcurrentHashMap<String, Integer>();");
             out.blank();
             out.open("X2cResourceProviderImpl(Context context)");
             out.line("Context application = Objects.requireNonNull(context, \"context\").getApplicationContext();");
@@ -32,6 +35,7 @@ final class ResourceProviderSourceGenerator {
         }
 
         generateIdentifier(out, model, pluginMode);
+        generateDesugaredDefaultBridges(out);
         generateStrings(out, model);
         generateColors(out, model);
         generateBooleans(out, model);
@@ -53,15 +57,84 @@ final class ResourceProviderSourceGenerator {
         return out.toString();
     }
 
+    /**
+     * Interface default methods are desugared independently in the host APK and plugin DEX.
+     * Emitting concrete methods avoids AbstractMethodError across that ClassLoader boundary.
+     */
+    private static void generateDesugaredDefaultBridges(JavaSource out) {
+        out.blank();
+        out.line("@Override");
+        out.open("public int findIdentifier(String type, String name)");
+        out.open("try");
+        out.line("return getIdentifier(type, name);");
+        out.close();
+        out.open("catch (IllegalArgumentException | Resources.NotFoundException missing)");
+        out.line("return 0;");
+        out.close();
+        out.close();
+        out.blank();
+        out.line("@Override");
+        out.open("public boolean hasResource(String type, String name)");
+        out.line("return findIdentifier(type, name) != 0;");
+        out.close();
+        out.blank();
+        out.line("@Override");
+        out.open("public CharSequence getText(String name)");
+        out.line("return getString(name);");
+        out.close();
+        out.blank();
+        out.line("@Override");
+        out.open("public int getDimensionPixelOffset(Context context, String name)");
+        out.line("return (int) getDimension(context, name);");
+        out.close();
+        out.blank();
+        out.line("@Override");
+        out.open("public int getDimensionPixelSize(Context context, String name)");
+        out.line("float value = getDimension(context, name);");
+        out.line("int rounded = (int) (value + 0.5f);");
+        out.line("if (rounded != 0) return rounded;");
+        out.line("if (value == 0f) return 0;");
+        out.line("return value > 0f ? 1 : -1;");
+        out.close();
+        out.blank();
+        out.line("@Override");
+        out.open("public CharSequence[] getTextArray(String name)");
+        out.line("return getStringArray(name);");
+        out.close();
+        out.blank();
+        out.line("@Override");
+        out.open("public int[] getIntArray(String name)");
+        out.line("return getIntegerArray(name);");
+        out.close();
+        out.blank();
+        out.line("@Override");
+        out.open("public CharSequence getQuantityText(String name, X2cQuantity quantity)");
+        out.line("return getPlural(name, quantity);");
+        out.close();
+        out.blank();
+        out.line("@Override");
+        out.open("public String getQuantityString(String name, X2cQuantity quantity, Object... arguments)");
+        out.line("return getPlural(name, quantity, arguments);");
+        out.close();
+    }
+
     private static void generateIdentifier(JavaSource out, Model model, boolean pluginMode) {
         out.blank();
         out.line("@Override");
         out.open("public int getIdentifier(String type, String name)");
         if (!pluginMode) {
             out.line("requireDeclared(type, name);");
+            out.line("String key = type + '/' + name;");
+            out.line("Integer cached = identifiers.get(key);");
+            out.line("if (cached != null) return cached.intValue();");
+            out.open("synchronized (identifiers)");
+            out.line("cached = identifiers.get(key);");
+            out.line("if (cached != null) return cached.intValue();");
             out.line("int identifier = context.getResources().getIdentifier(name, type, context.getPackageName());");
             out.line("if (identifier == 0) throw new Resources.NotFoundException(\"Missing host resource @\" + type + \"/\" + name + \" in \" + context.getPackageName());");
+            out.line("identifiers.put(key, Integer.valueOf(identifier));");
             out.line("return identifier;");
+            out.close();
             out.close();
             out.blank();
             out.open("private static void requireDeclared(String type, String name)");

@@ -38,7 +38,8 @@ final class GeneratedSourceWriter {
             write(packageDirectory.resolve("X2cColorStateLists.java"), generateColorStateLists(packageName, model));
         }
         if (hasSynchronousDrawables(model)) {
-            write(packageDirectory.resolve("X2cDrawables.java"), generateDrawables(packageName, model));
+            write(packageDirectory.resolve("X2cDrawables.java"),
+                    generateDrawables(packageName, model, pluginMode));
         }
         if (!assets.isEmpty()) {
             write(packageDirectory.resolve("X2cImages.java"), generateImages(packageName, assets));

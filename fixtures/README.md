@@ -1,144 +1,76 @@
-# X2C dynamic JAR demo
+# Fixtures
 
-这套 demo 同时验证两条互不混淆的集成路径：
+这里同时保留两种发布模式，并把动态插件测试拆成两个互不混杂的 payload。
 
-- `producer` + `producer-secondary` + `consumer`：两个 `pluginMode=true` 无资源 DEX JAR 的顺序动态加载。
-- `normal-library` + `normal-app`：`pluginMode=false` 的标准 AAR 静态依赖。
+## 动态插件宿主
 
-## producer：测试 library
+`consumer` 是唯一 APK。Host Application 只调用一次 `X2C.init(base)`；
+`DynamicLibraryLoader` 验签、安装并创建两个独立 `PluginClassLoader`，再分别安装 generated
+ComponentRegistry 与 X2C resource module。宿主以 implementation 持有 runtime、loader 和
+`x2c-plugin-base`，插件对这些模块只使用 compileOnly。
 
-`fixtures/producer` 应用 `dev.x2c.codegen`，产出：
-
-- `build/outputs/x2c/release/codegen.jar`：只含 JVM `.class`。
-- `build/outputs/x2c/release/codegen-dex.jar`：只含 Android `classes.dex`。
-
-它覆盖当前核心资源链路：标准拆分的 strings/colors/dimens/bools/integers/arrays/plurals/fractions/ids、`res/color` selector、完整 synthetic `R2` namespace、宿主 runtime `X2C.setContentView/inflate`、framework View/ViewGroup 专属 LayoutParams、自定义 ViewGroup contract、扩展 shape/selector、组合 drawable 和 CDN bitmap metadata。
-
-额外运行时代码：
-
-- `JvmFeatureProbe`：静态/非静态内部类、局部类、匿名类、lambda、方法引用、泛型、record、enum switch、数组、位运算、布尔逻辑、异常、同步方法、默认接口方法和 ClassLoader identity。
-- `DemoActivity`：只打进 JAR/DEX JAR，不在 library Manifest 声明；页面会创建由 XML 生成的成熟登录页和 framework 能力矩阵。
-- `producer-secondary/SecondaryActivity`：第二个 ClassLoader 中的完整电商页，覆盖 CDN 商品图、收藏、SKU、数量、购物车、购买、失败/取消/重试/缓存状态。
-- `LoginLogic`：不依赖 Android 的登录状态机，覆盖空值、邮箱格式、密码长度、账号归一化、错误凭据和成功凭据。
-- `LoginInputView`：通过 custom view contract 生成，验证自定义构造函数、typed setter、输入法与密码模式。
-
-登录页交互覆盖：
-
-- 邮箱/密码输入与逐字段错误提示；
-- 密码显示/隐藏、记住账号与 Activity 重建恢复；
-- 忘记密码、演示账号一键填入；
-- 微信、GitHub 和隐私政策入口反馈；
-- 登录中、失败、成功状态和关闭返回；
-- CDN 图片的异步加载与取消请求。
-
-页面根 `ScrollView` 直接来自 `content.xml`，Activity 通过自身 Class 自动取得 `X2cResources`，再调用句柄的 `setContentView/inflate`；业务不声明或传递 moduleName。独立的 `framework_matrix.xml` 用于验证多 layout 分发及多 JAR ID 隔离。能力矩阵覆盖 FrameLayout、RelativeLayout ID rule、GridLayout row/column/spec/weight、TableLayout/TableRow、RadioGroup、HorizontalScrollView、Button/CheckBox/Switch/ImageButton、ProgressBar/SeekBar/RatingBar。
-
-producer Manifest 保持为空，验证 JAR-first library 不依赖 Manifest merge。
-
-## consumer：动态宿主 app
-
-`fixtures/consumer` 没有对 producer JAR 的 `implementation`/`compileOnly` 依赖。构建时只把 `codegen-dex.jar` 作为测试 payload 放入签名 APK：
-
-consumer 通过 `implementation(project(":x2c-runtime"))` 持有 runtime；producer 仅 `compileOnly`，因此
-payload 中不会出现第二份 `dev.x2c.runtime.*`。
+宿主 APK 中的两个测试 envelope：
 
 ```text
-assets/x2c-demo/codegen-dex.jar
-assets/x2c-demo/codegen-dex.sha256
-assets/x2c-demo-secondary/codegen-dex.jar
-assets/x2c-demo-secondary/codegen-dex.sha256
+assets/x2c-layout-showcase/codegen-dex.{jar,descriptor,sig}
+assets/x2c-component-showcase/codegen-dex.{jar,descriptor,sig}
 ```
 
-运行流程：
+两个 JAR 都只有 `classes.dex`，不包含 Android `res/`、resource table、业务 Manifest 组件或
+`x2c-plugin-api/base/runtime/loader`。fixture 私钥只用于测试，不能进入生产。
 
-```text
-HostApplication.attachBaseContext
-  -> X2C.init(baseContext)，记录宿主 ClassLoader
-  -> 从 APK asset 复制 DEX JAR 到 app 私有 files 目录
-  -> 校验 SHA-256
-  -> 创建 PluginClassLoader（plugin-first，miss 时 host fallback，平台/runtime parent-first）
-  -> X2C.loadModule(context, entryClass) 从业务包路径发现 generated bootstrap
-  -> bootstrap 反射无关地初始化内部 X2cModule，并返回生成的唯一模块标识
-  -> 注册 runtime resource provider、CDN metadata 和全部 layout factory
-  -> 反射执行 FixtureLibrary/JvmFeatureProbe
-  -> 创建第二个 PluginClassLoader 并加载 producer-secondary
-  -> 自动发现并注册 secondary module，验证 primary module 仍可访问
-  -> HostApplication 安装共享 VerifiedHttpImageLoader
+测试 envelope 同样遵守生产防回滚约束：修改任一 payload 后，必须同步递增
+`fixtures/consumer/build.gradle.kts` 中对应的 showcase `versionCode`。复用版本号但改变摘要会在加载
+ClassLoader 前被明确拒绝，不能通过清空或放宽生产安装器来规避。
 
-点击宿主按钮
-  -> 显式 Intent 指向 dev.x2c.fixture.producer.DemoActivity
-  -> Activity 声明来自 consumer AndroidManifest.xml
-  -> DynamicAppComponentFactory 使用独立 PluginClassLoader 实例化 Activity
-  -> DemoActivity 通过 X2C.resources(DemoActivity.class) 取回对应 runtime 句柄
-  -> 打开 JAR 内的 DemoActivity 页面
+## Demo 1：Layout / resources / image showcase
 
-点击“打开动态电商页面”时，`DynamicAppComponentFactory` 改用第二个 `PluginClassLoader` 实例化
-`SecondaryActivity`。商品图使用题给百度 JPEG；JAR 内只有 URL/MIME/bytes/SHA-256 元数据，宿主下载后
-逐项校验。页面可主动触发成功、内容缓存、同 View 重绑、取消、故障 URL 与成功重试。
-```
+物理 module 为 `producer`，pluginId 为 `dev.x2c.fixture.layout-showcase`。
 
-宿主使用 framework `AppComponentFactory`，因此 demo app 的 minSdk 是 28。API 21–27 若需要直接加载 Activity，应实现代理 Activity/Instrumentation 方案；library 本身仍保持 minSdk 21。
+- `content.xml`：对外能力展厅、成熟登录页、点击/输入/校验/延迟结果/SharedPreferences；
+- `capability_catalog.xml`：以 hero、数据卡、支持层级表和能力自检展示 53 种 framework View、
+  28 种 ViewGroup/LayoutParams、values/drawable/custom View/图片的准确边界；
+- `framework_matrix.xml`：LinearLayout、FrameLayout、RelativeLayout、GridLayout、
+  TableLayout/TableRow、RadioGroup、HorizontalScrollView 及常用 framework View；
+- 自定义 View：Context-only、AttributeSet、四构造函数、自定义属性 setter、自定义 FlowLayout 和 LayoutParams；
+- values：string/format、color selector、dimen、integer、bool、fraction、array、typed-array、
+  plurals、synthetic id/R2；
+- drawable：shape/selector/layer-list/inset/clip/scale/rotate/level-list 和 bitmap-to-CDN metadata；
+- 图片：XML `android:src` 自动异步加载，成功、取消、重新绑定、宿主内存缓存和明确失败路径；
+- `JvmFeatureProbe`：内部类、lambda、泛型、集合、异常、逻辑运算等 JVM class-only 用例。
 
-## normal-library / normal-app：标准 AAR
+业务 Activity 继承独立 `business-base` Android library 中的普通 `BusinessBaseActivity extends Activity`。
+该根使用 `@X2cPluginBase`；宿主使用 `implementation`，两个插件使用 `compileOnly project`。插件构建只把
+实际继承的标注 class 闭包复制进 payload，并转换为 `BusinessBaseActivity -> PluginActivity`。页面会显示 constructor、
+attach/create/start/resume 顺序以及 plugin-private ClassLoader，验证真实业务基类代码被完整执行。
 
-`normal-library` 设置 `pluginMode=false`，通过 `api(project(":x2c-runtime"))` 暴露 runtime，原始
-`res/`、resource table 和 Library Manifest 均保留在 AAR 中。`normal-app` 只声明自己的 launcher
-Activity，并通过普通静态依赖和显式 Intent 跳转：
+## Demo 2：Activity / 四大组件 showcase
 
-```java
-startActivity(new Intent(this, NormalDemoActivity.class));
-```
+物理 module 为 `producer-secondary`，pluginId 为
+`dev.x2c.fixture.component-showcase`。
 
-Library Activity 的 Manifest 声明由 Android 标准 Manifest Merger 自动进入宿主，不需要
-`AppComponentFactory`、反射、DEX payload 或宿主重复声明。页面通过 runtime 高层入口加载：
+- Component Dashboard；
+- 四个独立 Activity 覆盖 standard、singleTop、singleTask、singleInstance、实例 identity、
+  taskId、onCreate/onNewIntent、self relaunch 与 Activity Result；
+- Service 覆盖 started/bound/stop、Binder、ComponentName、`START_NOT_STICKY`；
+- Receiver 覆盖显式 normal/ordered broadcast、result code/data、`goAsync().finish()`；
+- Provider 覆盖虚拟 authority、CRUD、query、call、applyBatch、ContentObserver 与 read-only file；
+- 插件内跳转、跨两个 ClassLoader 跳转、插件返回宿主 Activity；
+- Activity 同样使用 plugin-private `business-base` 闭包；Service/Receiver/Provider 保留宿主持有的
+  `x2c-plugin-base` 根，两种 ownership 在同一 payload 中同时验证。
 
-```java
-X2cResources resources = X2C.resources(this, NormalDemoActivity.class);
-resources.setContentView(this, "normal_content");
-```
+## 标准 AAR 模式
 
-首次调用会从业务 Class 的包路径找到 `<namespace>.x2c.X2cModuleBootstrap`，再从应用
-`PathClassLoader` 按需初始化生成的 `X2cModule`；normal `R2` 使用
-`Resources#getIdentifier` 绑定宿主最终的 `R.layout/R.id/...`；generated Provider 也在模块名称白名单校验后
-直接调用宿主 `Resources#getIdentifier`。Demo 会在运行时断言 X2C layout/ID 与 Android R 完全相等，
-并显示保留在 AAR 中的同一张本地 JPEG，证明它没有被转为 CDN metadata。
+`normal-library` + `normal-app` 验证 `pluginMode=false`。它保留正常 AAR resource table、
+Manifest Activity 和本地图片，由 generated provider 使用宿主 Resources；不会生成动态 DEX JAR。
 
-## 构建与运行
-
-完整验证：
+## 验证
 
 ```bash
 ./scripts/verify.sh
+./scripts/verify-plugin-modes.sh
+./scripts/verify-plugin-showcases.sh    # 需要 adb 设备
 ```
 
-AGP 8.11.1 要求 JDK 17+。如果当前 `JAVA_HOME` 较旧，可使用 Android Studio 自带 JBR：
-
-```bash
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./scripts/verify.sh
-```
-
-生成可安装的 debug APK：
-
-```bash
-./gradlew :fixtures:consumer:assembleDebug
-adb install -r fixtures/consumer/build/outputs/apk/debug/consumer-debug.apk
-adb shell am start -n dev.x2c.fixture.consumer/.MainActivity
-```
-
-打开宿主页后点击“打开动态登录页面”。动态 Activity 在宿主 Manifest 中声明为 `exported=false`，因此必须由宿主应用内的显式 Intent 启动；ADB shell 直接启动会按预期被 Android 安全策略拒绝。
-
-普通 AAR demo：
-
-```bash
-./gradlew :fixtures:normal-app:assembleDebug
-adb install -r fixtures/normal-app/build/outputs/apk/debug/normal-app-debug.apk
-adb shell am start -n dev.x2c.fixture.normalapp/.MainActivity
-```
-
-已在 LG LM-V600 真机验证宿主页、动态登录 Activity、电商 Activity、真实 CDN 成功/失败/取消/重试、
-SKU/数量/购物车交互，以及 normal AAR 本地图片。图片测试截图位于
-`.agent-workflows/screenshots/image-ecommerce/`。
-
-## 生产注意事项
-
-demo payload 位于已签名 APK 内，SHA-256 用来验证私有目录复制结果。若改为网络下载，必须增加独立签名、公钥校验、版本/回滚策略、下载与存储上限，并确认应用商店对动态执行代码的政策；图片 CDN 不应承载可执行 DEX。
+`verify.sh` 会检查两个 JAR、BusinessBase 依赖闭包与公共组件 base 边界、四种 launchMode 与其他组件报告、RSA envelope、
+宿主资源隔离、Manifest 固定容器、图片锁定元数据、deterministic rebuild，以及 normal AAR 对照组。

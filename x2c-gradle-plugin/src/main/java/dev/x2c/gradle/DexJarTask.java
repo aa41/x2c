@@ -1,15 +1,18 @@
 package dev.x2c.gradle;
 
 import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 import java.util.stream.Stream;
 import org.gradle.api.DefaultTask;
@@ -45,11 +48,19 @@ public abstract class DexJarTask extends DefaultTask {
     @Input
     public abstract Property<Integer> getMinApi();
 
+    @Input
+    public abstract Property<Boolean> getPluginMode();
+
     @OutputFile
     public abstract RegularFileProperty getOutputJar();
 
     @TaskAction
     public void dex() throws IOException {
+        if (!getPluginMode().get()) {
+            throw new GradleException(
+                    "x2c<Variant>DexJar requires x2c.pluginMode=true. "
+                            + "Normal integration mode must publish and consume the AAR.");
+        }
         Path work = getTemporaryDir().toPath().resolve("d8-output");
         if (Files.exists(work)) {
             try (Stream<Path> paths = Files.walk(work)) {
@@ -120,11 +131,40 @@ public abstract class DexJarTask extends DefaultTask {
         java.util.Arrays.sort(versions, Comparator.comparing(File::getName).reversed());
         for (File version : versions) {
             File executable = new File(version, isWindows() ? "d8.bat" : "d8");
-            if (executable.isFile()) {
+            File implementation = new File(version, "lib/d8.jar");
+            if (executable.isFile() && isCompatibleWithCurrentJava(implementation)) {
                 return executable;
             }
         }
-        throw new GradleException("Cannot find D8 in Android SDK: " + sdkDirectory);
+        throw new GradleException(
+                "Cannot find a D8 installation compatible with Java "
+                        + System.getProperty("java.specification.version")
+                        + " in Android SDK: " + sdkDirectory);
+    }
+
+    private static boolean isCompatibleWithCurrentJava(File implementation) {
+        if (!implementation.isFile()) {
+            return false;
+        }
+        try (JarFile jar = new JarFile(implementation)) {
+            JarEntry d8Class = jar.getJarEntry("com/android/tools/r8/D8.class");
+            if (d8Class == null) {
+                return false;
+            }
+            try (InputStream input = jar.getInputStream(d8Class);
+                    DataInputStream data = new DataInputStream(input)) {
+                if (data.readInt() != 0xCAFEBABE) {
+                    return false;
+                }
+                data.readUnsignedShort();
+                int requiredClassVersion = data.readUnsignedShort();
+                int currentClassVersion = (int) Double.parseDouble(
+                        System.getProperty("java.class.version"));
+                return requiredClassVersion <= currentClassVersion;
+            }
+        } catch (IOException | NumberFormatException ignored) {
+            return false;
+        }
     }
 
     private static boolean isWindows() {

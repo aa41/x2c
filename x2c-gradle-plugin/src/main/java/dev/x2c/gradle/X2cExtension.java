@@ -7,6 +7,9 @@ public abstract class X2cExtension {
     /** True for resource-free/dynamic plugins; false for normal Android resource integration. */
     public abstract Property<Boolean> getPluginMode();
 
+    /** Stable install/catalog identity. Required when the component transform plugin is applied. */
+    public abstract Property<String> getPluginId();
+
     /** Package used by generated source. Defaults to the Android namespace plus ".x2c". */
     public abstract Property<String> getGeneratedPackage();
 

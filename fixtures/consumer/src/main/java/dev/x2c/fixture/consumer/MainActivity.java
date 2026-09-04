@@ -1,7 +1,5 @@
 package dev.x2c.fixture.consumer;
 
-import android.app.Activity;
-import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -12,9 +10,11 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import dev.x2c.fixture.businessbase.BusinessBaseActivity;
+import dev.x2c.plugin.runtime.PluginActivityManager;
 
 /** Host-only launcher. It has no compile/runtime dependency on producer classes. */
-public final class MainActivity extends Activity {
+public final class MainActivity extends BusinessBaseActivity {
     private static final int PAGE = 0xFFF3F6FC;
     private static final int INK = 0xFF182033;
     private static final int MUTED = 0xFF667085;
@@ -53,14 +53,14 @@ public final class MainActivity extends Activity {
         brand.addView(brandCopy, brandCopyParams);
         page.addView(brand);
 
-        TextView headline = label("从独立 DEX JAR\n加载完整登录组件", 30f, INK);
+        TextView headline = label("两个独立 DEX JAR\n两套完整插件场景", 30f, INK);
         headline.setTypeface(Typeface.DEFAULT_BOLD);
         headline.setMaxLines(2);
         LinearLayout.LayoutParams headlineParams = matchWrap();
         headlineParams.topMargin = dp(30);
         page.addView(headline, headlineParams);
 
-        TextView subtitle = label("宿主 APK 不静态依赖业务 Library。点击后由 PluginClassLoader 实例化 JAR 内 Activity。",
+        TextView subtitle = label("Layout/资源矩阵与四大组件实验室分别由独立 PluginClassLoader 加载。",
                 15f, MUTED);
         subtitle.setLineSpacing(0f, 1.25f);
         LinearLayout.LayoutParams subtitleParams = matchWrap();
@@ -86,31 +86,31 @@ public final class MainActivity extends Activity {
         card.addView(status, statusParams);
         page.addView(card, cardParams);
 
-        TextView open = label("打开动态登录页面", 16f, Color.WHITE);
+        TextView open = label("Demo 1 · Layout / 资源 / 图片", 16f, Color.WHITE);
         open.setTypeface(Typeface.DEFAULT_BOLD);
         open.setGravity(Gravity.CENTER);
         open.setClickable(true);
         open.setFocusable(true);
-        open.setContentDescription("使用 PluginClassLoader 打开 JAR 登录页面");
+        open.setContentDescription("打开 Layout 与资源完整展示插件");
         open.setBackground(rounded(PRIMARY, 14));
         LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
         openParams.topMargin = dp(20);
         page.addView(open, openParams);
 
-        TextView openShop = label("打开动态电商页面", 16f, PRIMARY);
-        openShop.setTypeface(Typeface.DEFAULT_BOLD);
-        openShop.setGravity(Gravity.CENTER);
-        openShop.setClickable(true);
-        openShop.setFocusable(true);
-        openShop.setContentDescription("使用第二个 PluginClassLoader 打开 JAR 电商页面");
-        openShop.setBackground(rounded(Color.WHITE, 14));
-        LinearLayout.LayoutParams openShopParams = new LinearLayout.LayoutParams(
+        TextView openComponents = label("Demo 2 · Activity / 四大组件", 16f, PRIMARY);
+        openComponents.setTypeface(Typeface.DEFAULT_BOLD);
+        openComponents.setGravity(Gravity.CENTER);
+        openComponents.setClickable(true);
+        openComponents.setFocusable(true);
+        openComponents.setContentDescription("打开 launchMode 与四大组件完整展示插件");
+        openComponents.setBackground(rounded(Color.WHITE, 14));
+        LinearLayout.LayoutParams openComponentsParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
-        openShopParams.topMargin = dp(10);
-        page.addView(openShop, openShopParams);
+        openComponentsParams.topMargin = dp(10);
+        page.addView(openComponents, openComponentsParams);
 
-        TextView note = label("Activity 声明位于宿主 Manifest · 页面、逻辑与资源代码均来自 JAR", 12f, MUTED);
+        TextView note = label("插件 Activity 无需宿主预声明 · 由固定代理容器承载", 12f, MUTED);
         note.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams noteParams = matchWrap();
         noteParams.topMargin = dp(14);
@@ -120,22 +120,32 @@ public final class MainActivity extends Activity {
         if (startupFailure == null) {
             try {
                 status.setText(DynamicLibraryLoader.installationSummary() + "\n\n"
-                        + DynamicLibraryLoader.secondaryLibraryName() + "\n"
+                        + "host." + businessBaseSummary() + "\n\n"
+                        + DynamicLibraryLoader.componentLibraryName() + "\n"
                         + DynamicLibraryLoader.runJvmSelfTests() + "\n"
                         + DynamicLibraryLoader.runLoginSelfTests());
-                open.setOnClickListener(ignored -> startActivity(new Intent()
-                        .setClassName(getPackageName(), DynamicLibraryLoader.PLUGIN_ACTIVITY_CLASS)));
-                openShop.setOnClickListener(ignored -> startActivity(new Intent()
-                        .setClassName(getPackageName(), DynamicLibraryLoader.SECONDARY_ACTIVITY_CLASS)));
+                open.setOnClickListener(ignored -> PluginActivityManager.startActivity(
+                        this,
+                        DynamicLibraryLoader.LAYOUT_PLUGIN_ID,
+                        DynamicLibraryLoader.LAYOUT_ACTIVITY_CLASS));
+                openComponents.setOnClickListener(ignored -> PluginActivityManager.startActivity(
+                        this,
+                        DynamicLibraryLoader.COMPONENT_PLUGIN_ID,
+                        DynamicLibraryLoader.COMPONENT_ACTIVITY_CLASS));
             } catch (Exception error) {
                 showFailure(state, status, open, error);
-                openShop.setEnabled(false);
-                openShop.setAlpha(0.45f);
+                openComponents.setEnabled(false);
+                openComponents.setAlpha(0.45f);
             }
         } else {
             showFailure(state, status, open, startupFailure);
-            openShop.setEnabled(false);
-            openShop.setAlpha(0.45f);
+            openComponents.setEnabled(false);
+            openComponents.setAlpha(0.45f);
+        }
+
+        String origin = getIntent().getStringExtra("x2c.component.ORIGIN");
+        if (origin != null) {
+            status.append("\n\nNavigation origin: " + origin);
         }
 
         ScrollView scroll = new ScrollView(this);

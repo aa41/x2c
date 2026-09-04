@@ -27,6 +27,8 @@ public final class X2C {
             new HashMap<String, X2cResourceProvider>();
     private static final Map<ClassLoader, Set<String>> MODULES_BY_CLASS_LOADER =
             new WeakHashMap<ClassLoader, Set<String>>();
+    private static final Map<Class<?>, String> MODULES_BY_ANCHOR =
+            new WeakHashMap<Class<?>, String>();
     private static volatile Context applicationContext;
     private static volatile ClassLoader hostClassLoader;
     private static volatile String hostPackageName;
@@ -36,35 +38,51 @@ public final class X2C {
     /** Initializes the host context and the ClassLoader used as the plugin fallback. */
     public static void init(Context context) {
         Objects.requireNonNull(context, "context");
-        Context candidate = context.getApplicationContext();
-        if (candidate == null) {
-            candidate = context;
+        if (applicationContext != null) {
+            requireInitialized(context);
+            return;
         }
+        Context candidate = applicationContext(context);
         String packageName = candidate.getPackageName();
         ClassLoader loader = candidate.getClassLoader();
         if (loader == null) {
             loader = X2C.class.getClassLoader();
         }
         synchronized (LOCK) {
-            if (hostPackageName != null && !hostPackageName.equals(packageName)) {
-                throw new IllegalStateException(
-                        "X2C is already initialized for " + hostPackageName + "; cannot bind " + packageName);
+            if (applicationContext != null) {
+                requireSameHost(packageName);
+                return;
             }
-            applicationContext = candidate;
             hostPackageName = packageName;
             hostClassLoader = loader;
+            // Publish last: readers that observe this volatile write also observe the host fields.
+            applicationContext = candidate;
         }
     }
 
-    /** Initializes the host and invokes a generated X2cModule through the plugin/host loader. */
+    /** Verifies that the process-wide host initialization has already completed. */
+    public static void requireInitialized(Context context) {
+        Objects.requireNonNull(context, "context");
+        Context initializedContext = applicationContext;
+        if (initializedContext == null) {
+            throw new IllegalStateException(
+                    "X2C.init(context) must be called once from Application before using X2C");
+        }
+        Context candidate = applicationContext(context);
+        if (candidate == initializedContext) {
+            return;
+        }
+        requireSameHost(candidate.getPackageName());
+    }
+
+    /** Invokes a generated X2cModule through the already initialized host loader. */
     public static void init(Context context, String moduleClassName) {
-        init(context);
         init(context, moduleClassName, requireHostClassLoader());
     }
 
-    /** Initializes the host and invokes a generated X2cModule through the plugin/host loader. */
+    /** Invokes a generated X2cModule through the plugin/host loader. */
     public static void init(Context context, String moduleClassName, ClassLoader pluginClassLoader) {
-        init(context);
+        requireInitialized(context);
         Objects.requireNonNull(moduleClassName, "moduleClassName");
         try {
             Class<?> module = loadClass(moduleClassName, pluginClassLoader);
@@ -153,7 +171,7 @@ public final class X2C {
         return requireHostClassLoader().loadClass(className);
     }
 
-    /** Called by generated modules after their normal/plugin R2 initialization has completed. */
+    /** Called by generated modules after constructing their module-scoped resource provider. */
     public static void registerResourceProvider(
             String moduleName, X2cResourceProvider provider) {
         Objects.requireNonNull(moduleName, "moduleName");
@@ -215,8 +233,18 @@ public final class X2C {
     public static X2cResources resources(Context context, Class<?> anchorClass) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(anchorClass, "anchorClass");
-        init(context);
-        return resources(discoverModule(context, anchorClass));
+        requireInitialized(context);
+        String moduleName;
+        synchronized (LOCK) {
+            moduleName = MODULES_BY_ANCHOR.get(anchorClass);
+        }
+        if (moduleName == null) {
+            moduleName = discoverModule(context, anchorClass);
+            synchronized (LOCK) {
+                MODULES_BY_ANCHOR.put(anchorClass, moduleName);
+            }
+        }
+        return resources(moduleName);
     }
 
     /** Called by generated X2cModule classes. IDs are isolated by module name. */
@@ -281,6 +309,13 @@ public final class X2C {
                 modules.remove(moduleName);
                 if (modules.isEmpty()) {
                     loaders.remove();
+                }
+            }
+            Iterator<Map.Entry<Class<?>, String>> anchors =
+                    MODULES_BY_ANCHOR.entrySet().iterator();
+            while (anchors.hasNext()) {
+                if (moduleName.equals(anchors.next().getValue())) {
+                    anchors.remove();
                 }
             }
         }
@@ -431,6 +466,7 @@ public final class X2C {
     private static void ensureModuleInitialized(Context context, String moduleName) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(moduleName, "moduleName");
+        requireInitialized(context);
         synchronized (LOCK) {
             if (RESOURCE_PROVIDERS.containsKey(moduleName)) {
                 return;
@@ -441,6 +477,20 @@ public final class X2C {
             loader = X2C.class.getClassLoader();
         }
         init(context, moduleName + ".X2cModule", loader);
+    }
+
+    private static Context applicationContext(Context context) {
+        Context application = context.getApplicationContext();
+        return application == null ? context : application;
+    }
+
+    private static void requireSameHost(String packageName) {
+        String initializedPackage = hostPackageName;
+        if (initializedPackage != null && !initializedPackage.equals(packageName)) {
+            throw new IllegalStateException(
+                    "X2C is already initialized for " + initializedPackage
+                            + "; cannot bind " + packageName);
+        }
     }
 
     private static String discoverModule(Context context, Class<?> anchorClass) {
@@ -466,16 +516,10 @@ public final class X2C {
             packageName = separator < 0 ? "" : packageName.substring(0, separator);
         }
 
-        // Compatibility fallback for JARs generated before automatic bootstraps existed.
-        Set<String> registered = modulesFor(anchorLoader);
-        if (registered.size() == 1) {
-            return registered.iterator().next();
-        }
         throw new IllegalStateException(
                 "Cannot discover an X2C module for " + anchorClass.getName()
                         + " from ClassLoader " + anchorLoader
-                        + ". Rebuild the library with the current X2C Gradle plugin."
-                        + (registered.isEmpty() ? "" : " Registered modules: " + registered));
+                        + ". Rebuild the library with the current X2C Gradle plugin.");
     }
 
     private static String initializeBootstrap(

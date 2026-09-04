@@ -37,7 +37,9 @@ final class ValuesResourceParser {
                 case "string":
                     rejectAttributes(source.file, element, setOf("name", "translatable"));
                     rejectChildElements(source.file, element);
-                    putUnique(model.strings, name, element.getTextContent(), source.file, "string");
+                    putUnique(model.strings, name,
+                            decodeAndroidText(source.file, element.getTextContent()),
+                            source.file, "string");
                     break;
                 case "color":
                     rejectAttributes(source.file, element, setOf("name"));
@@ -102,7 +104,7 @@ final class ValuesResourceParser {
             requireTag(file, item, "item");
             rejectAttributes(file, item, setOf());
             rejectChildElements(file, item);
-            values.add(item.getTextContent());
+            values.add(decodeAndroidText(file, item.getTextContent()));
         }
         putUnique(model.stringArrays, name, values, file, "string-array");
     }
@@ -140,7 +142,8 @@ final class ValuesResourceParser {
             rejectChildElements(file, item);
             String quantity = item.getAttribute("quantity");
             requireOneOf(file, "plural quantity", quantity, "zero", "one", "two", "few", "many", "other");
-            if (values.putIfAbsent(quantity, item.getTextContent()) != null) {
+            if (values.putIfAbsent(quantity,
+                    decodeAndroidText(file, item.getTextContent())) != null) {
                 throw fail(file, "Duplicate plural quantity " + quantity + " for " + name);
             }
         }
@@ -169,7 +172,7 @@ final class ValuesResourceParser {
         if (value.startsWith("@")) {
             throw fail(file, "Unsupported typed-array reference: " + value);
         }
-        return new TypedValueItem("STRING", raw);
+        return new TypedValueItem("STRING", decodeAndroidText(file, raw));
     }
 
     static void validateValueReferences(Model model) {

@@ -1,17 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="secondary_library_name">Secondary X2C JAR</string>
-    <string name="secondary_status">第二个独立 module 已完成注册</string>
-    <string name="shop_title">X2C 优选</string>
-    <string name="product_title">复古质感随身斜挎包 · 秋季限定色</string>
-    <string name="product_subtitle">轻量防泼水面料｜可调节肩带｜通勤旅行两用</string>
-    <string name="delivery_copy">今日付款，预计明日送达 · 运费险已赠送</string>
-    <string name="image_description">商品 CDN 大图</string>
-    <string name="image_initial_status">准备校验 CDN 图片…</string>
-    <string name="price_symbol">¥</string>
-    <string name="price_value">269</string>
-    <string name="price_original">¥399</string>
-    <string name="sales_copy">月销 2,341 · 98% 好评</string>
-    <string name="coupon_copy">限时立减 ¥30</string>
-    <string name="service_copy">7 天无理由 · 48 小时发货 · 正品保障</string>
+    <string name="secondary_library_name">Component Showcase Plugin</string>
+    <string name="secondary_status">四大组件插件已完成独立注册</string>
 </resources>

@@ -28,9 +28,6 @@ final class LayoutSourceGenerator {
         out.blank();
         out.open("public final class X2cLayouts");
         out.line("private X2cLayouts() {}");
-        out.open("private static int dp(Context context, float value)");
-        out.line("return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, context.getResources().getDisplayMetrics()));");
-        out.close();
         for (Map.Entry<String, LayoutNode> item : model.layouts.entrySet()) {
             out.blank();
             out.open("public static View " + javaName(item.getKey()) + "(Context context)");

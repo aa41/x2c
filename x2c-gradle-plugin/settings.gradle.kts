@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "x2c-gradle-plugin"
+include(":activity-compiler", ":activity-gradle-plugin")

@@ -1,0 +1,25 @@
+apply plugin: 'com.android.library'
+
+def selectedAgp = (findProperty('agpVersion') ?: '3.5.4').toString()
+def agpMajor = Integer.parseInt(selectedAgp.tokenize('.')[0])
+
+repositories {
+    maven { url uri('../../../build/compat-maven-cache') }
+    google()
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    compileOnly 'dev.x2c:x2c-plugin-api:0.1.0-SNAPSHOT'
+}
+
+android {
+    compileSdkVersion agpMajor < 7 ? 28 : 36
+    if (agpMajor >= 7) {
+        namespace 'dev.x2c.compatibility.base'
+    }
+    defaultConfig {
+        minSdkVersion 21
+    }
+}

@@ -3,6 +3,7 @@ package dev.x2c.runtime;
 import android.app.Activity;
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.view.ViewGroup;
@@ -32,11 +33,15 @@ public final class X2cResources {
     }
 
     public int findIdentifier(String name, String type) {
-        return provider.findIdentifier(type, name);
+        try {
+            return provider.getIdentifier(type, name);
+        } catch (IllegalArgumentException | Resources.NotFoundException missing) {
+            return 0;
+        }
     }
 
     public boolean hasResource(String name, String type) {
-        return provider.hasResource(type, name);
+        return findIdentifier(name, type) != 0;
     }
 
     public int id(String name) {
@@ -52,7 +57,7 @@ public final class X2cResources {
     }
 
     public CharSequence getText(String name) {
-        return provider.getText(name);
+        return provider.getString(name);
     }
 
     public String getString(String name, Object... arguments) {
@@ -100,11 +105,15 @@ public final class X2cResources {
     }
 
     public int getDimensionPixelOffset(Context context, String name) {
-        return provider.getDimensionPixelOffset(context, name);
+        return (int) provider.getDimension(context, name);
     }
 
     public int getDimensionPixelSize(Context context, String name) {
-        return provider.getDimensionPixelSize(context, name);
+        float value = provider.getDimension(context, name);
+        int rounded = (int) (value + 0.5f);
+        if (rounded != 0) return rounded;
+        if (value == 0f) return 0;
+        return value > 0f ? 1 : -1;
     }
 
     public float fraction(String name, float base, float parentBase) {
@@ -120,7 +129,7 @@ public final class X2cResources {
     }
 
     public CharSequence[] getTextArray(String name) {
-        return provider.getTextArray(name);
+        return provider.getStringArray(name);
     }
 
     public String[] getStringArray(String name) {
@@ -132,7 +141,7 @@ public final class X2cResources {
     }
 
     public int[] getIntArray(String name) {
-        return provider.getIntArray(name);
+        return provider.getIntegerArray(name);
     }
 
     public Object[] array(Context context, String name) {
@@ -148,12 +157,12 @@ public final class X2cResources {
     }
 
     public CharSequence getQuantityText(String name, X2cQuantity quantity) {
-        return provider.getQuantityText(name, quantity);
+        return provider.getPlural(name, quantity);
     }
 
     public String getQuantityString(
             String name, X2cQuantity quantity, Object... arguments) {
-        return provider.getQuantityString(name, quantity, arguments);
+        return provider.getPlural(name, quantity, arguments);
     }
 
     public Drawable drawable(Context context, String name) {

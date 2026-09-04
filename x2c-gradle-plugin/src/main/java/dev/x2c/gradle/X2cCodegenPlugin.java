@@ -34,7 +34,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
     @Override
     public void apply(final Project project) {
         final X2cExtension extension = project.getExtensions().create("x2c", X2cExtension.class);
-        extension.getPluginMode().convention(true);
+        extension.getPluginMode().convention(pluginModeConvention(project));
         extension.getMinApi().convention(21);
 
         project.getPluginManager().withPlugin(ANDROID_LIBRARY_PLUGIN, new Action<org.gradle.api.plugins.AppliedPlugin>() {
@@ -51,6 +51,17 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                 }
             }
         });
+    }
+
+    private static boolean pluginModeConvention(Project project) {
+        Object configured = project.findProperty("x2c.pluginMode");
+        if (configured == null) return true;
+        String value = String.valueOf(configured).trim();
+        if ("true".equalsIgnoreCase(value)) return true;
+        if ("false".equalsIgnoreCase(value)) return false;
+        throw new GradleException(
+                "Gradle property x2c.pluginMode must be exactly true or false, but was: "
+                        + configured);
     }
 
     private static void configureAndroidLibrary(final Project project, final X2cExtension extension) {
@@ -158,6 +169,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                                 d8Executable.getParentFile(), "lib/d8.jar"));
                         task.getBootClasspath().from(android.getBootClasspath());
                         task.getMinApi().set(extension.getMinApi());
+                        task.getPluginMode().set(extension.getPluginMode());
                         task.getOutputJar().set(new File(
                                 project.getBuildDir(), "outputs/x2c/" + variant.getName() + "/codegen-dex.jar"));
                     }

@@ -14,7 +14,8 @@
 兼容环境已增加 AGP 3.5.4/Gradle 5.4.1/JDK 8、AGP 4.1.3/Gradle 6.5/JDK 8、
 AGP 7.3.1/7.4.2/Gradle 7.5/JDK 11，以及 AGP
 8.0.1/8.1.0/8.3.1/8.5.2/8.7.3/8.9.1/8.11.1/8.12.3/8.13.1。各环境均实际验证
-generated source → JavaCompile → `codegen.jar`，并检查 JavaCompile source 集合包含规范生成目录。
+generated source → JavaCompile → `codegen.jar` → Activity transform/registry → DEX JAR，并检查
+JavaCompile source 集合包含规范生成目录。DEX 任务会自动避开 classfile 版本高于当前 Gradle JVM 的 D8。
 
 ```text
 真实 res 输入
@@ -24,6 +25,8 @@ generated source → JavaCompile → `codegen.jar`，并检查 JavaCompile sourc
   -> AGP JavaCompile
   -> current-variant JVM compiler outputs
   -> deterministic codegen.jar
+  -> Activity superclass/final-callsite transform + generated direct registry
+  -> activity-plugin.jar
   -> D8
   -> codegen-dex.jar (classes.dex)
 
@@ -37,15 +40,37 @@ codegen.jar
 - 当前 fixture 的 `codegen.jar` 无 Manifest、`res/`、图片、`R.class`、runtime 副本或 metadata；plugin 模式生成完整 synthetic `R2.id/layout/string/color/drawable/dimen/bool/integer/array/plurals/fraction`，`X2cModule` 将私有 provider 与布局注册到宿主持有的 runtime，不再保留重复的 `X2cIds`。producer 业务源码不直接引用任何 generated 类型。
 - `codegen-dex.jar` 只有一个有效 `dex\n035` `classes.dex`。
 - DEX dump 可见 generated values/layout/drawable/image classes 和 library entry class。
-- consumer release APK 构建成功，宿主 `classes.dex` 不含任何 producer/generated class；APK 仅用两个 `assets/x2c-demo/*` entry 携带 DEX JAR 测试 payload 与 SHA-256，标准 AGP 仍保留空 `resources.arsc`。
+- consumer release APK 构建成功，宿主 `classes.dex` 不含任何 producer/generated class；APK 为两个测试
+  payload 各携带 DEX JAR、signed descriptor 和 RSA signature，标准 AGP 仍保留空 `resources.arsc`。
 - `aapt2 dump resources` 只输出 `Binary APK`，没有 resource package entries。
-- 编译器 34 项自测覆盖完整 synthetic R2、namespace bootstrap 自动发现、normal 模式宿主 ID/本地位图绑定、多 layout runtime registry、未声明 ID 拒绝、framework ViewGroup/LayoutParams 矩阵、扩展 values、color selector、shape/selector/组合 drawable 与 API 门槛。
-- producer 中三个构造策略 fixture 加一个真实 `FlowLayout extends ViewGroup`；后者使用自定义 `MarginLayoutParams`、静态 factory、三个类型化 layout setter 和 children-finished hook，生成源码经 Android JavaCompile 成功，报告记录 `customViews=4`。
+- 编译器 36 项自测覆盖完整 synthetic R2、namespace bootstrap 自动发现、normal 模式宿主 ID/本地位图绑定、多 layout runtime registry、未声明 ID 拒绝、framework ViewGroup/LayoutParams 矩阵、扩展 values、Android 文本转义、color selector、shape/selector/组合 drawable 与 API 门槛；未知文本转义会构建期失败。
+- producer 中多种构造策略 fixture 加一个真实 `FlowLayout extends ViewGroup`；后者使用自定义 `MarginLayoutParams`、静态 factory、三个类型化 layout setter 和 children-finished hook，生成源码经 Android JavaCompile 成功，报告记录 `customViews=5`。
 - JVM probe 已在普通 JDK `URLClassLoader` 中执行并返回 `PASS checksum=175`；同一套内部类、局部类、匿名类、lambda、方法引用、泛型、record、switch、异常、同步与逻辑运算代码已通过 D8。
-- producer `DemoActivity` 只存在于 DEX JAR，Activity 声明只存在于 consumer Manifest；宿主使用 API 28+ `AppComponentFactory` 将 Activity 实例化路由到 `PluginClassLoader`。该 loader 对插件业务类 plugin-first，miss 后回退宿主，对平台和 `dev.x2c.runtime` 强制 parent-first。模块 provider 按其真实 loader 登记，Activity 使用自身 class 精确取回对应 `X2cResources`。
+- producer `DemoActivity` 只存在于 DEX JAR，不存在于 producer/consumer Manifest。当前 fixture 已使用独立
+  `business-base` Android library：宿主 `implementation` 副本保持 `BusinessBaseActivity -> Activity`，两个
+  插件从 `compileOnly project` 精确复制 `@X2cPluginBase` 闭包并转换为
+  `BusinessBaseActivity -> PluginActivity`。编译器自测同时覆盖 same-JAR 三层链、标注 compileOnly
+  base/helper/include、非 Activity 标注拒绝、外部 runtime dependency 链、重复 class、resource AAR 和
+  AndroidX fail-closed。generated registry 直接构造 delegate；
+  宿主 Manifest 只有 4 种 launchMode × 8 个
+  固定代理容器，不再使用 `AppComponentFactory`。loader 对插件业务类 plugin-first、miss 后回退宿主，对
+  平台与全部 X2C/plugin runtime 强制 parent-first。模块 provider 按真实 loader 登记，Activity 使用自身
+  class 精确取回对应 `X2cResources`。
 - JAR 打包前会解析 class constant pool，拒绝非系统 `R`/`R$*`、`TypedArray`、`obtainStyledAttributes`、`Resources.obtainAttributes/getIdentifier`；不会仅靠“产物里没有 R.class”判断安全。
 - producer 的 JAR/DEX 任务已验证 configuration cache 可存储并在下一次构建复用。
-- 已在 LG LM-V600 真机验证宿主持有的 runtime、plugin-first/host-fallback `PluginClassLoader`、动态 Activity 创建、登录交互与 framework 矩阵；同时捕获并修复了旧 ART 不提供 `getClassLoadingLock` 的兼容问题。
+- 安装器对 canonical pluginId/versionCode/versionName/runtime ABI/dependency closure SHA-256/payload
+  SHA-256 descriptor 执行 RSA 验签；在动态代码落盘前拒绝 runtime ABI 不匹配，写入前设为只读，并拒绝
+  降级或相同 versionCode 的内容替换。
+- 全部源码中的进程级 `X2C.init(context)` 调用只存在于 plugin demo 的 `HostApplication` 和 normal demo
+  的 `NormalApplication`，两者均位于 `attachBaseContext`。loader、业务 Activity、generated bootstrap/module
+  不再重新绑定宿主；generated module 只用 `requireInitialized` 校验，并以 volatile 双重检查完成每个
+  ClassLoader/module 一次的 Provider/Layout 注册。anchor class 到 module name 的结果也会缓存。
+- 已在 LG LM-V600 真机验证宿主持有的 runtime、plugin-first/host-fallback `PluginClassLoader`、动态 Activity
+  创建、登录交互与 framework 矩阵；完整导航脚本同时通过宿主→插件→宿主 Result、同插件显式 Intent、
+  插件 `startActivityForResult`、两个 ClassLoader 间双向跳转、`singleTop/onNewIntent` 和插件→宿主，并检查
+  BaseActivity 探针的 constructor/attach/create/start/resume 次数及 lifecycle `super` 前后顺序，无 `FATAL`、
+  `ActivityNotFoundException`、`VerifyError` 或 `AbstractMethodError`。同时捕获并修复了旧 ART
+  不提供 `getClassLoadingLock` 的兼容问题。
 
 ## 为什么不是 AAR
 
@@ -93,7 +118,7 @@ codegen.jar
 
 1. strict JAR 是独立 breaking artifact，不应静默替换原 AAR 坐标。
 2. plugin 模式中 XML 是 generator input，class-only JAR/DEX JAR 是跨版本不含资源的发布边界；normal
-   模式保留 AGP resource pipeline，以便 `R2.init(context)` 绑定宿主合并后的真实 resource ID。
+   模式保留 AGP resource pipeline，由 module-scoped Provider 按需解析并缓存宿主合并后的真实 resource ID。
 3. 只使用 AGP 3.5–8.x 共同存在的 public legacy Variant API。资源目录来自 variant `SourceProvider`；
    `registerJavaGeneratingTask` 负责 Android Studio generated-source model，并额外通过 Gradle 公共
    `JavaCompile.source/dependsOn` 固化真实编译边；
@@ -102,16 +127,20 @@ codegen.jar
 5. 图片发布是独立 CI 流水线；Gradle 只消费不可变 lock，不上传、不读凭据、不访问网络。
 6. 普通 JAR 和 DEX JAR分开，避免把 JVM ClassLoader 与 Android DexClassLoader 混为一谈。
 7. `x2c-runtime` 是宿主依赖且只允许一个实例；动态 payload 对它使用 compileOnly，禁止复制进插件。
+8. Activity 插件的架构、API 支持矩阵、安全安装协议与 Google Play 风险独立记录在
+   [ACTIVITY_PLUGIN.md](ACTIVITY_PLUGIN.md)。
 
 ## 双模式边界
 
 - `pluginMode=true`：所有 R2 字段是稳定的编译期常量，适合无 resource table 的动态 payload；这些
   synthetic 值不能传给宿主 `Resources.getString/getDrawable`，业务通过宿主 `X2cResources` 获取值，
   generated Values/Drawables 仅作为 provider 的内部实现。
-- `pluginMode=false`：R2 字段由 `context.getResources().getIdentifier(name, type,
-  context.getPackageName())` 初始化，可以传给宿主 Resources，但不是 Java compile-time constant，不能用于
-  `switch case` 或 annotation。generated Provider 在模块白名单校验后也直接调用同一宿主 API；初始化或
-  Provider 查询返回 0 都会抛 `Resources.NotFoundException`。
+- `pluginMode=false`：不再生成静态可变 R2 字段或 `R2.init()`。generated Provider 是唯一宿主 ID
+  解析入口，在模块白名单校验后首次调用
+  `context.getResources().getIdentifier(name, type, context.getPackageName())` 并缓存；返回 0 会抛
+  `Resources.NotFoundException`。normal R2 仅保留 `R2.<type>.<name>(context)` 无状态兼容方法，业务推荐
+  `X2cResources.id/layout/requireView`。模块初始化使用 volatile 双重检查，资源缓存命中走无锁读取；这些
+  运行时 ID 不能用于 `switch case` 或 annotation。
 - 生成的 `X2cModule` 消除了 layout switch 对编译期常量的依赖；namespace bootstrap 让两种模式都能以
   业务 anchor Class 自动初始化，不要求业务声明 generated package 或 module name。
 

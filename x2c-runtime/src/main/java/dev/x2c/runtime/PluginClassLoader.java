@@ -53,6 +53,10 @@ public final class PluginClassLoader extends DexClassLoader {
                 || name.startsWith("dalvik.")
                 || name.startsWith("org.xml.")
                 || name.startsWith("org.w3c.")
-                || name.startsWith("dev.x2c.runtime.");
+                || name.startsWith("dev.x2c.runtime.")
+                || name.startsWith("dev.x2c.plugin.api.")
+                || name.startsWith("dev.x2c.plugin.base.")
+                || name.startsWith("dev.x2c.plugin.runtime.")
+                || name.startsWith("dev.x2c.plugin.loader.");
     }
 }

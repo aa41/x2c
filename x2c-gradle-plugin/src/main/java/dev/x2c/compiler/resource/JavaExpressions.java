@@ -71,11 +71,13 @@ final class JavaExpressions {
                 : value;
     }
 
-    static String generatedIdExpression(String value) {
+    static String generatedIdExpression(String value, boolean pluginMode) {
         IdReference id = parseIdReference(null, value);
         return id.kind == IdKind.ANDROID
                 ? "android.R.id." + javaName(id.name)
-                : "R2.id." + javaName(id.name);
+                : pluginMode
+                        ? "R2.id." + javaName(id.name)
+                        : "X2cModule.identifier(\"id\", " + javaString(id.name) + ")";
     }
 
     static String typedValueUnit(String unit) {

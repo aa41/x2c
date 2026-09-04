@@ -1,9 +1,9 @@
 package dev.x2c.compiler.resource;
 
-import java.util.Set;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.Set;
 
 /** Single source of truth for supported framework Views, ViewGroups, attributes and LayoutParams. */
 final class FrameworkViewRegistry {
@@ -74,10 +74,6 @@ final class FrameworkViewRegistry {
             "accessibilityLiveRegion", "accessibilityHeading", "screenReaderFocusable");
 
     private FrameworkViewRegistry() {}
-
-    static boolean isFrameworkView(String tag) {
-        return FRAMEWORK_VIEW_TAGS.contains(tag);
-    }
 
     static boolean isContainer(String tag) {
         return FRAMEWORK_CONTAINERS.contains(tag);

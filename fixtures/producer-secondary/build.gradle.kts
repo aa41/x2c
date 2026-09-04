@@ -1,10 +1,14 @@
 plugins {
     id("com.android.library") version "8.11.1"
     id("dev.x2c.codegen")
+    id("dev.x2c.activity-plugin")
 }
 
 dependencies {
+    compileOnly(project(":fixtures:business-base"))
     compileOnly(project(":x2c-runtime"))
+    compileOnly(project(":x2c-plugin-runtime"))
+    compileOnly(project(":x2c-plugin-base"))
 }
 
 android {
@@ -26,7 +30,9 @@ android {
 }
 
 x2c {
-    pluginMode.set(true)
+    // pluginMode defaults to true and can be supplied with -Px2c.pluginMode=true.
+    // false is rejected while the component transform plugin remains applied.
+    pluginId.set("dev.x2c.fixture.component-showcase")
     generatedPackage.set("dev.x2c.fixture.secondary.generated")
     assetLockFile.set(layout.projectDirectory.file("x2c-assets.lock.json"))
     minApi.set(21)

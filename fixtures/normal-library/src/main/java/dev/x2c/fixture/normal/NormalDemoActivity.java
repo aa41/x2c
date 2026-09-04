@@ -54,10 +54,10 @@ public final class NormalDemoActivity extends Activity {
 
     private static void assertHostResourceIds(X2cResources resources) {
         if (resources.layout("normal_content") != R.layout.normal_content) {
-            throw new IllegalStateException("Integration R2.layout was not bound to Android R.layout");
+            throw new IllegalStateException("X2C Provider layout ID differs from Android R.layout");
         }
         if (resources.id("normal_action_button") != R.id.normal_action_button) {
-            throw new IllegalStateException("Integration R2.id was not bound to Android R.id");
+            throw new IllegalStateException("X2C Provider view ID differs from Android R.id");
         }
     }
 }

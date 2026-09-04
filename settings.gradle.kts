@@ -25,6 +25,11 @@ dependencyResolutionManagement {
 rootProject.name = "x2c-plugin"
 include(
     ":x2c-runtime",
+    ":x2c-plugin-api",
+    ":x2c-plugin-base",
+    ":x2c-plugin-loader",
+    ":x2c-plugin-runtime",
+    ":fixtures:business-base",
     ":fixtures:producer",
     ":fixtures:producer-secondary",
     ":fixtures:consumer",

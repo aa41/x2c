@@ -273,8 +273,9 @@ final class LayoutEmitter {
                     if (pluginMode) {
                         out.line("X2cImages.load(" + variable + ", " + javaString(source) + ");");
                     } else {
-                        out.line(variable + ".setImageDrawable(context.getResources().getDrawable(R2.drawable."
-                                + javaName(source) + ", context.getTheme()));");
+                        out.line(variable + ".setImageDrawable(context.getResources().getDrawable("
+                                + "X2cModule.identifier(\"drawable\", " + javaString(source)
+                                + "), context.getTheme()));");
                     }
                 } else {
                     out.line(variable + ".setImageDrawable(X2cDrawables." + javaName(source) + "(context));");
@@ -799,7 +800,9 @@ final class LayoutEmitter {
         IdReference id = parseIdReference(null, value);
         return id.kind == IdKind.ANDROID
                 ? "android.R.id." + javaName(id.name)
-                : "R2.id." + javaName(id.name);
+                : pluginMode
+                        ? "R2.id." + javaName(id.name)
+                        : "X2cModule.identifier(\"id\", " + javaString(id.name) + ")";
     }
 
     private static String constantName(String value) {

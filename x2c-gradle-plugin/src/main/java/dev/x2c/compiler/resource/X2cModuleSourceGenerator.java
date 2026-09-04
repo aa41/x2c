@@ -17,24 +17,30 @@ final class X2cModuleSourceGenerator {
         out.blank();
         out.open("public final class X2cModule");
         out.line("public static final String NAME = \"" + packageName + "\";");
-        out.line("private static boolean initialized;");
+        out.line("private static volatile boolean initialized;");
+        if (!pluginMode) {
+            out.line("private static volatile X2cResourceProviderImpl provider;");
+        }
         out.line("private X2cModule() {}");
         out.blank();
-        out.open("public static synchronized void init(Context context)");
+        out.open("public static void init(Context context)");
         out.line("Objects.requireNonNull(context, \"context\");");
-        out.line("X2C.init(context);");
-        if (!pluginMode) {
-            out.line("R2.init(context);");
-        }
         out.line("if (initialized) return;");
-        out.line("X2C.registerResourceProvider(NAME, new X2cResourceProviderImpl("
-                + (pluginMode ? "" : "context") + "));");
+        out.open("synchronized (X2cModule.class)");
+        out.line("if (initialized) return;");
+        out.line("X2C.requireInitialized(context);");
+        out.line("X2cResourceProviderImpl created = new X2cResourceProviderImpl("
+                + (pluginMode ? "" : "context") + ");");
+        out.line("X2C.registerResourceProvider(NAME, created);");
         if (hasImages) {
             out.line("X2cImages.register();");
         }
         for (String layoutName : model.layoutIds.keySet()) {
             String javaName = javaName(layoutName);
-            out.open("X2C.registerLayout(NAME, \"" + layoutName + "\", R2.layout." + javaName
+            String layoutId = pluginMode
+                    ? "R2.layout." + javaName
+                    : "created.getIdentifier(\"layout\", \"" + layoutName + "\")";
+            out.open("X2C.registerLayout(NAME, \"" + layoutName + "\", " + layoutId
                     + ", new LayoutFactory()");
             out.line("@Override public View create(Context factoryContext) {");
             out.indent();
@@ -43,10 +49,27 @@ final class X2cModuleSourceGenerator {
             out.line("}");
             out.closeWith(");");
         }
+        if (!pluginMode) {
+            out.line("provider = created;");
+        }
         out.line("initialized = true;");
         out.close();
+        out.close();
         out.blank();
-        out.line("public static synchronized boolean isInitialized() { return initialized; }");
+        out.line("public static boolean isInitialized() { return initialized; }");
+        if (!pluginMode) {
+            out.blank();
+            out.open("static int identifier(Context context, String type, String name)");
+            out.line("if (!initialized) init(context);");
+            out.line("return identifier(type, name);");
+            out.close();
+            out.blank();
+            out.open("static int identifier(String type, String name)");
+            out.line("X2cResourceProviderImpl current = provider;");
+            out.line("if (current == null) throw new IllegalStateException(\"X2cModule.init(context) must be called before resolving resources for \" + NAME);");
+            out.line("return current.getIdentifier(type, name);");
+            out.close();
+        }
         out.close();
         return out.toString();
     }

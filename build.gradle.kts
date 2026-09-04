@@ -10,6 +10,7 @@ tasks.register("verifyX2c") {
         ":fixtures:producer:x2cReleaseDexJar",
         ":fixtures:producer-secondary:x2cReleaseJar",
         ":fixtures:producer-secondary:x2cReleaseDexJar",
+        ":fixtures:business-base:assembleRelease",
         ":fixtures:consumer:assembleRelease",
         ":fixtures:normal-library:assembleRelease",
         ":fixtures:normal-app:assembleRelease",

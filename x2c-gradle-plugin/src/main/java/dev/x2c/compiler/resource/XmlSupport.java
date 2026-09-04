@@ -172,6 +172,51 @@ final class XmlSupport {
         return element.getAttributeNS(ANDROID_NS, localName);
     }
 
+    /** Decodes the explicit escape sequences accepted by Android text resources. */
+    static String decodeAndroidText(File file, String value) {
+        StringBuilder result = new StringBuilder(value.length());
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character != '\\') {
+                result.append(character);
+                continue;
+            }
+            if (++index >= value.length()) {
+                throw fail(file, "Android text ends with an incomplete escape sequence");
+            }
+            char escaped = value.charAt(index);
+            switch (escaped) {
+                case 'n': result.append('\n'); break;
+                case 'r': result.append('\r'); break;
+                case 't': result.append('\t'); break;
+                case '\\':
+                case '\'':
+                case '"':
+                case '@':
+                case '?':
+                case '#':
+                    result.append(escaped);
+                    break;
+                case 'u':
+                    if (index + 4 >= value.length()) {
+                        throw fail(file, "Android text has an incomplete \\u escape sequence");
+                    }
+                    String hexadecimal = value.substring(index + 1, index + 5);
+                    try {
+                        result.append((char) Integer.parseInt(hexadecimal, 16));
+                    } catch (NumberFormatException error) {
+                        throw fail(file, "Android text has an invalid \\u escape sequence: "
+                                + hexadecimal);
+                    }
+                    index += 4;
+                    break;
+                default:
+                    throw fail(file, "Unsupported Android text escape sequence: \\" + escaped);
+            }
+        }
+        return result.toString();
+    }
+
     static void requireOneOf(File file, String name, String value, String... allowed) {
         if (!setOf(allowed).contains(value)) {
             throw fail(file, name + " must be one of " + Arrays.toString(allowed) + ", got: " + value);

@@ -9,7 +9,7 @@ import java.util.Map;
 final class DrawableSourceGenerator {
     private DrawableSourceGenerator() {}
 
-    static String generateDrawables(String packageName, Model model) {
+    static String generateDrawables(String packageName, Model model, boolean pluginMode) {
         JavaSource out = new JavaSource(packageName, "X2cDrawables");
         out.line("import android.content.Context;");
         out.line("import android.graphics.drawable.*;");
@@ -173,7 +173,8 @@ final class DrawableSourceGenerator {
                             + roundedDimensionExpression(layer.bottom) + ");");
                 }
                 if (layer.id != null) {
-                    out.line("drawable.setId(" + index + ", " + generatedIdExpression(layer.id) + ");");
+                    out.line("drawable.setId(" + index + ", "
+                            + generatedIdExpression(layer.id, pluginMode) + ");");
                 }
             }
             out.line("return drawable;");

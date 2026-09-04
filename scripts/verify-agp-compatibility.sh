@@ -110,9 +110,15 @@ if [[ ${X2C_OFFLINE:-false} == true ]]; then
 fi
 
 JAVA_HOME="$task_java17" "$task_root/gradlew" -p "$task_root/x2c-gradle-plugin" \
-    publishToMavenLocal "${task_offline_args[@]}" --no-configuration-cache --console=plain
+    publishToMavenLocal \
+    :activity-compiler:publishToMavenLocal \
+    :activity-gradle-plugin:publishToMavenLocal \
+    ${task_offline_args[@]+"${task_offline_args[@]}"} \
+    --no-configuration-cache --console=plain
 JAVA_HOME="$task_java17" ANDROID_HOME="$task_sdk" "$task_root/gradlew" -p "$task_root" \
-    :x2c-runtime:publishToMavenLocal "${task_offline_args[@]}" \
+    :x2c-runtime:publishToMavenLocal \
+    :x2c-plugin-api:publishToMavenLocal \
+    ${task_offline_args[@]+"${task_offline_args[@]}"} \
     --no-configuration-cache --console=plain
 
 run_fixture() {
@@ -121,7 +127,8 @@ run_fixture() {
     local task_agp=$3
     JAVA_HOME="$task_java_home" ANDROID_HOME="$task_sdk" "$task_gradle" \
         -p "$task_root/compatibility/fixture" clean verifyGeneratedSourceModel \
-        "-PagpVersion=$task_agp" "${task_offline_args[@]}" --no-daemon --no-build-cache --console=plain
+        "-PagpVersion=$task_agp" ${task_offline_args[@]+"${task_offline_args[@]}"} \
+        --no-daemon --no-build-cache --console=plain
 }
 
 run_fixture "$task_gradle54" "$task_java8" 3.5.4
@@ -137,7 +144,8 @@ run_fixture "$task_gradle812" "$task_java17" 8.9.1
 run_fixture "$task_gradle813" "$task_java17" 8.11.1
 JAVA_HOME="$task_java17" ANDROID_HOME="$task_sdk" "$task_gradle813" \
     -p "$task_root/compatibility/fixture" clean verifyGeneratedSourceModel assembleRelease \
-    -PagpVersion=8.11.1 -Px2cPluginMode=false "${task_offline_args[@]}" \
+    -PagpVersion=8.11.1 -Px2cPluginMode=false \
+    ${task_offline_args[@]+"${task_offline_args[@]}"} \
     --no-daemon --no-build-cache --console=plain
 task_normal_aar="$task_root/compatibility/fixture/build/outputs/aar/x2c-agp-compatibility-fixture-release.aar"
 if [[ ! -f "$task_normal_aar" ]] \

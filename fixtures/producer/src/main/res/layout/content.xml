@@ -72,6 +72,72 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/capability_catalog_host"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:orientation="vertical" />
+
+    <LinearLayout
+        android:id="@+id/matrix_host"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:orientation="vertical" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/login_card"
+        android:orientation="vertical"
+        android:padding="@dimen/space_medium">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="本地图片 → CDN 元数据 → 宿主异步加载"
+            android:textColor="@color/ink"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/image_test_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="XML android:src 已触发首次异步加载"
+            android:textColor="@color/muted"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/image_reload"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="重试/缓存" />
+            <Button
+                android:id="@+id/image_cancel"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="取消" />
+            <Button
+                android:id="@+id/image_failure"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="失败路径" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/space_large"
@@ -322,11 +388,44 @@
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/matrix_host"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        android:orientation="vertical" />
+        android:background="@drawable/login_card"
+        android:orientation="vertical"
+        android:padding="@dimen/space_medium">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Shadow 式 BusinessBaseActivity 依赖闭包"
+            android:textColor="@color/ink"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/base_activity_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="等待检查宿主/插件双份 Class 与生命周期"
+            android:textColor="@color/muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/run_base_activity_probe"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/secondary_button_state"
+            android:clickable="true"
+            android:contentDescription="检查插件私有 BusinessBaseActivity 转换闭包"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="检查 BusinessBase 转换"
+            android:textColor="@color/primary"
+            android:textSize="14sp" />
+    </LinearLayout>
 
     <dev.x2c.fixture.producer.widget.FlowLayout
         android:layout_width="match_parent"

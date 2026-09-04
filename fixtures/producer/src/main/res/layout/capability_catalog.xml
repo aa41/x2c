@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/catalog_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:background="@drawable/matrix_gradient"
+        android:clipToPadding="false"
+        android:padding="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="X2C CAPABILITY GALLERY"
+                android:textAllCaps="true"
+                android:textColor="@color/surface"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Layout &amp; View\n全能力展厅"
+                android:textColor="@color/surface"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="XML → Java factory → class-only JAR → DEX JAR"
+                android:textColor="@color/surface"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:background="@drawable/badge_background"
+            android:paddingStart="10dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="6dp"
+            android:text="RESOURCE FREE"
+            android:textColor="@color/primary"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="88dp"
+        android:layout_marginTop="14dp"
+        android:background="@color/primary_soft"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/catalog_pipeline_xml"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/badge_background"
+            android:padding="8dp"
+            android:text="XML"
+            android:textColor="@color/primary"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/catalog_pipeline_java"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="20dp"
+            android:layout_toEndOf="@id/catalog_pipeline_xml"
+            android:text="→  Java Factory"
+            android:textColor="@color/ink"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:text="→  DEX"
+            android:textColor="@color/success"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="能力总览"
+        android:textColor="@color/ink"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="点击卡片查看真实支持边界；所有未知属性在打包期 fail closed。"
+        android:textColor="@color/muted"
+        android:textSize="12sp" />
+
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:alignmentMode="alignMargins"
+        android:columnCount="2"
+        android:orientation="horizontal"
+        android:rowCount="2"
+        android:useDefaultMargins="true">
+
+        <TextView
+            android:id="@+id/catalog_layout_card"
+            android:layout_width="0dp"
+            android:layout_height="104dp"
+            android:layout_column="0"
+            android:layout_columnWeight="1"
+            android:layout_gravity="fill"
+            android:layout_row="0"
+            android:background="@drawable/matrix_outline"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="28\nViewGroup 类型"
+            android:textColor="@color/primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/catalog_view_card"
+            android:layout_width="0dp"
+            android:layout_height="104dp"
+            android:layout_column="1"
+            android:layout_columnWeight="1"
+            android:layout_gravity="fill"
+            android:layout_row="0"
+            android:background="@drawable/matrix_outline"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="53\nFramework View"
+            android:textColor="@color/violet"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/catalog_resource_card"
+            android:layout_width="0dp"
+            android:layout_height="104dp"
+            android:layout_column="0"
+            android:layout_columnWeight="1"
+            android:layout_gravity="fill"
+            android:layout_row="1"
+            android:background="@drawable/matrix_outline"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="10+\nValues 类型"
+            android:textColor="@color/success"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/catalog_drawable_card"
+            android:layout_width="0dp"
+            android:layout_height="104dp"
+            android:layout_column="1"
+            android:layout_columnWeight="1"
+            android:layout_gravity="fill"
+            android:layout_row="1"
+            android:background="@drawable/matrix_outline"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="9\nDrawable 家族"
+            android:textColor="@color/aqua"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </GridLayout>
+
+    <TextView
+        android:id="@+id/catalog_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/panel_background"
+        android:padding="14dp"
+        android:text="Layout：Linear / Frame / Relative / Grid / Table / RadioGroup / Scroll / ViewAnimator / Toolbar 等 28 类父容器，分别生成正确 LayoutParams。"
+        android:textColor="@color/ink"
+        android:textIsSelectable="true"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/login_card"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="28 类 ViewGroup / LayoutParams 路径"
+            android:textColor="@color/ink"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="线性：LinearLayout · TableLayout · TableRow · RadioGroup · TabWidget · NumberPicker · ZoomControls · SearchView\n\nFrame：FrameLayout · ScrollView · HorizontalScrollView · ViewAnimator · ViewFlipper · ViewSwitcher · TextSwitcher · ImageSwitcher · TabHost · CalendarView · DatePicker · TimePicker\n\n定位：RelativeLayout · DialerFilter · TwoLineListItem · GridLayout · AbsoluteLayout · WebView · Toolbar · ActionMenuView"
+            android:textColor="@color/muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/login_card"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="53 类 Framework View 目录"
+            android:textColor="@color/ink"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="文本与输入：TextView · EditText · Button · AutoCompleteTextView · MultiAutoCompleteTextView · CheckedTextView · Chronometer\n\n选择与状态：CheckBox · RadioButton · ToggleButton · Switch · Spinner · ProgressBar · SeekBar · RatingBar\n\n图片与渲染：ImageView · ImageButton · ImageSwitcher · QuickContactBadge · SurfaceView · TextureView · Space\n\n列表与选择器：ListView · GridView · ExpandableListView · CalendarView · DatePicker · TimePicker · NumberPicker\n\n容器与系统控件：Linear · Frame · Relative · Grid · Table · RadioGroup · Scroll · ViewAnimator 家族 · Tab 家族 · Toolbar · ActionMenuView · SearchView · DialerFilter · TwoLineListItem · ZoomControls · WebView · AbsoluteLayout"
+            android:textColor="@color/muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@color/primary_soft"
+            android:padding="10dp"
+            android:text="支持类型可构造不等于宣称 Android 全部专有属性。专项映射、通用属性和扩展契约分层生效；未知或不安全属性在构建期明确报错。"
+            android:textColor="@color/primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="View 支持层级"
+        android:textColor="@color/ink"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TableLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/login_card"
+        android:padding="10dp"
+        android:shrinkColumns="1"
+        android:stretchColumns="1">
+
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="完整映射"
+                android:textColor="@color/success"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="Text / Image / CompoundButton / Progress / Seek / Rating"
+                android:textColor="@color/ink" />
+        </TableRow>
+
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="通用属性"
+                android:textColor="@color/primary"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="List / Grid / Spinner / WebView / Date / Time / Calendar 等"
+                android:textColor="@color/ink" />
+        </TableRow>
+
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="扩展契约"
+                android:textColor="@color/violet"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="自定义构造器、setter/field 属性、自定义 LayoutParams"
+                android:textColor="@color/ink" />
+        </TableRow>
+    </TableLayout>
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:layout_marginTop="12dp"
+        android:fillViewport="false"
+        android:smoothScrollingEnabled="true">
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/badge_background"
+                android:padding="10dp"
+                android:text="TextView"
+                android:textColor="@color/primary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/badge_background"
+                android:padding="10dp"
+                android:text="ImageView"
+                android:textColor="@color/primary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/badge_background"
+                android:padding="10dp"
+                android:text="Progress"
+                android:textColor="@color/primary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/badge_background"
+                android:padding="10dp"
+                android:text="AdapterView"
+                android:textColor="@color/primary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/badge_background"
+                android:padding="10dp"
+                android:text="Custom View"
+                android:textColor="@color/primary" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/login_card"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="资源全部转 Class"
+            android:textColor="@color/ink"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="values：string · color · bool · integer · dimen · fraction · array · plurals · id\n\ndrawable：shape · selector · layer-list · inset · clip · scale · rotate · level-list\n\nbitmap：本地输入 → HTTPS/SHA-256/MIME/bytes 锁定元数据 → 宿主异步加载"
+            android:textColor="@color/muted"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/catalog_self_test"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/login_button_state"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="运行能力自检"
+        android:textColor="@color/surface"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/catalog_self_test_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="等待验证 layout factory / synthetic ID / drawable / values / image metadata"
+        android:textColor="@color/muted"
+        android:textSize="12sp" />
+</LinearLayout>

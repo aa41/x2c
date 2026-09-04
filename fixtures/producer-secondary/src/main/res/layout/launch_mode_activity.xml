@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/launch_mode_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/secondary_page"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/launch_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="STANDARD"
+        android:textColor="@color/secondary_ink"
+        android:textSize="30sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/launch_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/shop_chip_selected"
+        android:paddingStart="12dp"
+        android:paddingTop="7dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="7dp"
+        android:text="X2cPluginActivity annotation"
+        android:textColor="@color/secondary_accent_dark"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/launch_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/shop_card"
+        android:padding="16dp"
+        android:text="等待生命周期"
+        android:textColor="@color/secondary_muted"
+        android:textIsSelectable="true"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/relaunch_same"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:layout_marginTop="18dp"
+        android:background="@drawable/shop_buy"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="再次启动当前 Activity"
+        android:textColor="@color/secondary_surface"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/return_result"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/shop_outline"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="返回 RESULT_OK"
+        android:textColor="@color/secondary_ink" />
+    <TextView
+        android:id="@+id/open_component_home"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/shop_outline"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="打开新的组件 Dashboard"
+        android:textColor="@color/secondary_ink" />
+    <TextView
+        android:id="@+id/close_launch"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="10dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="关闭当前页面"
+        android:textColor="@color/secondary_muted" />
+</LinearLayout>

@@ -19,6 +19,8 @@ public final class ResourceCompilerSelfTest {
     public static void main(String[] args) throws Exception {
         ResourceCompilerSelfTest tests = new ResourceCompilerSelfTest();
         tests.run("compilesValuesShapeAndLayoutDeterministically", tests::compilesValuesShapeAndLayoutDeterministically);
+        tests.run("decodesAndroidTextEscapes", tests::decodesAndroidTextEscapes);
+        tests.run("rejectsUnknownAndroidTextEscape", tests::rejectsUnknownAndroidTextEscape);
         tests.run("generatesStableSyntheticIdsAndR2", tests::generatesStableSyntheticIdsAndR2);
         tests.run("generatesCompletePluginR2Namespace", tests::generatesCompletePluginR2Namespace);
         tests.run("generatesHostBackedR2", tests::generatesHostBackedR2);
@@ -52,7 +54,7 @@ public final class ResourceCompilerSelfTest {
         tests.run("verifiesBitmapDigestAgainstLock", tests::verifiesBitmapDigestAgainstLock);
         tests.run("rejectsManifestComponents", tests::rejectsManifestComponents);
         tests.run("allowsManifestComponentsInNormalMode", tests::allowsManifestComponentsInNormalMode);
-        System.out.println("ResourceCompilerSelfTest: 34 tests passed");
+        System.out.println("ResourceCompilerSelfTest: 36 tests passed");
     }
 
     private void run(String name, ThrowingRunnable test) throws Exception {
@@ -97,16 +99,60 @@ public final class ResourceCompilerSelfTest {
 
         Path first = temporaryDirectory.resolve("first");
         Path second = temporaryDirectory.resolve("second");
-        new ResourceCompiler().compile(List.of(res.toFile()), "sample.generated", null,
-                first.resolve("src").toFile(), first.resolve("report").toFile());
-        new ResourceCompiler().compile(List.of(res.toFile()), "sample.generated", null,
-                second.resolve("src").toFile(), second.resolve("report").toFile());
+        new ResourceCompiler().compile(List.of(res.toFile()), "sample.generated", "sample", null,
+                null, 21, true, first.resolve("src").toFile(), first.resolve("report").toFile());
+        new ResourceCompiler().compile(List.of(res.toFile()), "sample.generated", "sample", null,
+                null, 21, true, second.resolve("src").toFile(), second.resolve("report").toFile());
 
         assertEquals(treeDigest(first), treeDigest(second));
         String layout = Files.readString(first.resolve("src/sample/generated/X2cLayouts.java"));
         assertContains(layout, "X2cValues.Strings.title");
         assertContains(layout, "X2cDrawables.panel(context)");
+        assertFalse(layout.contains("private static int dp("),
+                "Generated layouts must not contain unused helpers");
         assertContains(Files.readString(first.resolve("report/report.json")), "\"unsupported=0\"");
+    }
+
+    private void decodesAndroidTextEscapes() throws Exception {
+        Path res = temporaryDirectory.resolve("res");
+        write(res.resolve("values/strings.xml"), """
+                <resources>
+                    <string name="escaped">first\\nsecond\\tpath\\\\tail</string>
+                </resources>
+                """);
+        write(res.resolve("layout/screen.xml"), """
+                <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="alpha\\nbeta" />
+                </FrameLayout>
+                """);
+
+        compile(res, null);
+        Path generated = temporaryDirectory.resolve("generated/sample/generated");
+        assertContains(Files.readString(generated.resolve("X2cValues.java")),
+                "public static final String escaped = \"first\\nsecond\\tpath\\\\tail\";");
+        assertContains(Files.readString(generated.resolve("X2cLayouts.java")),
+                ".setText(\"alpha\\nbeta\");");
+    }
+
+    private void rejectsUnknownAndroidTextEscape() throws Exception {
+        Path res = temporaryDirectory.resolve("res");
+        write(res.resolve("layout/screen.xml"), """
+                <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="bad\\x" />
+                </FrameLayout>
+                """);
+        assertContains(expectFailure(() -> compile(res, null)).getMessage(),
+                "Unsupported Android text escape sequence: \\x");
     }
 
     private void generatesStableSyntheticIdsAndR2() throws Exception {
@@ -171,7 +217,11 @@ public final class ResourceCompilerSelfTest {
             assertContains(module, "return X2cLayouts." + name + "(factoryContext)");
             assertContains(provider, "case \"" + name + "\": return R2.layout." + name);
         }
-        assertContains(module, "X2C.registerResourceProvider(NAME, new X2cResourceProviderImpl())");
+        assertContains(module, "X2cResourceProviderImpl created = new X2cResourceProviderImpl()");
+        assertContains(module, "X2C.registerResourceProvider(NAME, created)");
+        assertContains(module, "X2C.requireInitialized(context)");
+        assertFalse(module.contains("X2C.init(context)"),
+                "Generated modules must not repeat process-wide host initialization");
         assertFalse(Files.exists(generated.resolve("X2C.java")),
                 "The generated X2C facade duplicates the host-owned runtime API");
     }
@@ -289,20 +339,45 @@ public final class ResourceCompilerSelfTest {
         String r2 = Files.readString(generated.resolve("R2.java"));
         String module = Files.readString(generated.resolve("X2cModule.java"));
         String provider = Files.readString(generated.resolve("X2cResourceProviderImpl.java"));
-        assertContains(r2, "public static synchronized void init(Context context)");
-        assertContains(r2, "context.getResources().getIdentifier(resName, resType, context.getPackageName())");
-        assertContains(r2, "public static int screen;");
-        assertContains(r2, "public static int title;");
+        String layout = Files.readString(generated.resolve("X2cLayouts.java"));
+        assertContains(r2, "private static int identifier(Context context, String type, String name)");
+        assertContains(r2, "return X2cModule.identifier(context, type, name)");
+        assertFalse(r2.contains("X2cModule.init(context)"),
+                "Normal R2 lookups must use the module's lock-free initialized fast path");
+        assertContains(r2, "public static int screen(Context context)");
+        assertContains(r2, "return identifier(context, \"layout\", \"screen\")");
+        assertContains(r2, "public static int title(Context context)");
+        assertFalse(r2.contains("R2.init"), "Normal R2 must not own global initialization state");
+        assertFalse(r2.contains("getResources().getIdentifier"),
+                "Normal R2 must delegate all ID resolution to the resource provider");
+        assertFalse(r2.contains("public static int screen;"),
+                "Normal R2 must not expose mutable process-global ID fields");
         assertFalse(r2.contains("public static final int screen"),
                 "Host resource IDs cannot be Java compile-time constants");
-        assertContains(module, "R2.init(context)");
-        assertContains(module, "new X2cResourceProviderImpl(context)");
+        assertFalse(module.contains("R2.init(context)"), "X2cModule must not initialize R2 state");
+        assertContains(module, "X2cResourceProviderImpl created = new X2cResourceProviderImpl(context)");
+        assertContains(module, "private static volatile X2cResourceProviderImpl provider");
+        assertContains(module, "private static volatile boolean initialized");
+        assertContains(module, "public static void init(Context context)");
+        assertContains(module, "synchronized (X2cModule.class)");
+        assertContains(module,
+                "created.getIdentifier(\"layout\", \"screen\")");
+        assertContains(module, "static int identifier(Context context, String type, String name)");
+        assertContains(module, "if (!initialized) init(context)");
+        assertContains(module, "static int identifier(String type, String name)");
         assertContains(provider, "X2cResourceProviderImpl(Context context)");
         assertContains(provider,
                 "context.getResources().getIdentifier(name, type, context.getPackageName())");
+        assertContains(provider, "public int getIdentifier(String type, String name)");
+        assertContains(provider, "Integer cached = identifiers.get(key)");
+        assertContains(provider, "synchronized (identifiers)");
+        assertContains(provider, "identifiers.put(key, Integer.valueOf(identifier))");
         assertContains(provider, "case \"screen\": return;");
         assertFalse(provider.contains("return R2.layout.screen"),
                 "Normal provider must resolve identifiers directly through host Resources");
+        assertContains(layout, "setId(X2cModule.identifier(\"id\", \"anchor\"))");
+        assertFalse(layout.contains("R2.id.anchor"),
+                "Normal generated layouts must resolve IDs through the module provider");
         assertContains(provider, "case \"title\": return X2cValues.Strings.title;");
         assertContains(Files.readString(temporaryDirectory.resolve("report/report.json")),
                 "\"mode\": \"HOST_RESOURCE_IDS\"");
@@ -878,7 +953,7 @@ public final class ResourceCompilerSelfTest {
         String provider = Files.readString(generated.resolve("X2cResourceProviderImpl.java"));
         String module = Files.readString(generated.resolve("X2cModule.java"));
         assertContains(layout,
-                "context.getResources().getDrawable(R2.drawable.local_product, context.getTheme())");
+                "context.getResources().getDrawable(X2cModule.identifier(\"drawable\", \"local_product\"), context.getTheme())");
         assertContains(provider,
                 "getDrawable(getIdentifier(\"drawable\", name), context.getTheme())");
         assertContains(module, "new X2cResourceProviderImpl(context)");
@@ -952,6 +1027,7 @@ public final class ResourceCompilerSelfTest {
         new ResourceCompiler().compile(
                 List.of(res.toFile()),
                 "sample.generated",
+                "sample",
                 lock == null ? null : lock.toFile(),
                 customViews == null ? null : customViews.toFile(),
                 21,

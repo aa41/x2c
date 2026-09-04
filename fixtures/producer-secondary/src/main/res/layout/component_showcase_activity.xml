@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/component_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/secondary_page"
+    android:clipToPadding="false"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:id="@+id/component_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/shop_page_padding"
+        android:paddingTop="20dp"
+        android:paddingEnd="@dimen/shop_page_padding"
+        android:paddingBottom="32dp">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="168dp"
+            android:background="@drawable/shop_card">
+
+            <ImageView
+                android:id="@+id/component_header_image"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="本地占位图与 CDN 图切换测试"
+                android:scaleType="centerCrop"
+                android:src="@drawable/product_hero" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:background="#CC2E2521"
+                android:padding="16dp"
+                android:text="插件四大组件实验室\n4 launchMode · Service · Receiver · Provider"
+                android:textColor="@color/secondary_surface"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/shop_gap"
+            android:background="@drawable/shop_card"
+            android:orientation="vertical"
+            android:padding="@dimen/shop_card_padding">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Activity / launchMode"
+                android:textColor="@color/secondary_ink"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/launch_mode_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/shop_chip"
+                android:padding="10dp"
+                android:text="等待 Activity 测试"
+                android:textColor="@color/secondary_muted"
+                android:textIsSelectable="true"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/open_standard"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/shop_outline"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="standard"
+                    android:textColor="@color/secondary_ink" />
+                <TextView
+                    android:id="@+id/open_single_top"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/shop_outline"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="singleTop"
+                    android:textColor="@color/secondary_ink" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/open_single_task"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/shop_outline"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="singleTask"
+                    android:textColor="@color/secondary_ink" />
+                <TextView
+                    android:id="@+id/open_single_instance"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/shop_outline"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="singleInstance"
+                    android:textColor="@color/secondary_ink" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/open_standard_for_result"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/shop_buy"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="startActivityForResult → RESULT_OK"
+                android:textColor="@color/secondary_surface"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/shop_gap"
+            android:background="@drawable/shop_card"
+            android:orientation="vertical"
+            android:padding="@dimen/shop_card_padding">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Service · started / bound"
+                android:textColor="@color/secondary_ink"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/service_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Service: waiting"
+                android:textColor="@color/secondary_muted"
+                android:textSize="12sp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/service_start"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="START" />
+                <Button
+                    android:id="@+id/service_bind"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="BIND" />
+                <Button
+                    android:id="@+id/service_stop"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="STOP" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/shop_gap"
+            android:background="@drawable/shop_card"
+            android:orientation="vertical"
+            android:padding="@dimen/shop_card_padding">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BroadcastReceiver · normal / ordered / goAsync"
+                android:textColor="@color/secondary_ink"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/receiver_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Receiver: waiting"
+                android:textColor="@color/secondary_muted"
+                android:textSize="12sp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/receiver_normal"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="NORMAL" />
+                <Button
+                    android:id="@+id/receiver_ordered"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="ORDERED" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/shop_gap"
+            android:background="@drawable/shop_card"
+            android:orientation="vertical"
+            android:padding="@dimen/shop_card_padding">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ContentProvider · virtual authority"
+                android:textColor="@color/secondary_ink"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/provider_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text=""
+                android:textColor="@color/secondary_muted"
+                android:textIsSelectable="true"
+                android:textSize="12sp" />
+            <TextView
+                android:id="@+id/provider_run"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/shop_buy"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="运行 CRUD / call / batch / observer / file"
+                android:textColor="@color/secondary_surface"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/open_layout_showcase"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/shop_outline"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="跨 ClassLoader 打开 Layout 插件"
+            android:textColor="@color/secondary_ink"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/open_host_activity"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/shop_outline"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="插件 → 宿主 Activity"
+            android:textColor="@color/secondary_ink"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/close_component_showcase"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="关闭组件实验室"
+            android:textColor="@color/secondary_muted" />
+    </LinearLayout>
+</ScrollView>

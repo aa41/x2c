@@ -8,11 +8,17 @@ buildscript {
     dependencies {
         classpath "com.android.tools.build:gradle:${findProperty('agpVersion') ?: '3.5.4'}"
         classpath 'dev.x2c:x2c-gradle-plugin:0.1.0-SNAPSHOT'
+        classpath 'dev.x2c:activity-gradle-plugin:0.1.0-SNAPSHOT'
     }
 }
 
+def pluginPayloadMode = (findProperty('x2cPluginMode') ?: 'true').toBoolean()
+
 apply plugin: 'com.android.library'
 apply plugin: 'dev.x2c.codegen'
+if (pluginPayloadMode) {
+    apply plugin: 'dev.x2c.activity-plugin'
+}
 
 repositories {
     maven { url uri('../../build/compat-maven-cache') }
@@ -22,7 +28,17 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'dev.x2c:x2c-runtime:0.1.0-SNAPSHOT'
+    if (pluginPayloadMode) {
+        compileOnly project(':business-base')
+    }
+    if (pluginPayloadMode) {
+        compileOnly 'dev.x2c:x2c-runtime:0.1.0-SNAPSHOT'
+    } else {
+        api 'dev.x2c:x2c-runtime:0.1.0-SNAPSHOT'
+    }
+    if (pluginPayloadMode) {
+        compileOnly 'dev.x2c:x2c-plugin-api:0.1.0-SNAPSHOT'
+    }
 }
 
 def selectedAgp = (findProperty('agpVersion') ?: '3.5.4').toString()
@@ -36,10 +52,17 @@ android {
     defaultConfig {
         minSdkVersion 21
     }
+    if (!pluginPayloadMode) {
+        sourceSets.main.manifest.srcFile 'src/normal/AndroidManifest.xml'
+    }
+    sourceSets.main.java.srcDir(pluginPayloadMode ? 'src/plugin/java' : 'src/normal/java')
 }
 
 x2c {
-    pluginMode.set((findProperty('x2cPluginMode') ?: 'true').toBoolean())
+    pluginMode.set(pluginPayloadMode)
+    if (pluginPayloadMode) {
+        pluginId.set('dev.x2c.compatibility')
+    }
     generatedPackage.set('dev.x2c.compatibility.generated')
     minApi.set(21)
 }
@@ -68,35 +91,96 @@ task verifyGeneratedSourceModel {
             throw new GradleException('Automatic module bootstrap was not generated from the Android namespace')
         }
         def r2Source = file("$generated/dev/x2c/compatibility/generated/R2.java").text
-        def pluginMode = (findProperty('x2cPluginMode') ?: 'true').toBoolean()
+        def moduleSource = file("$generated/dev/x2c/compatibility/generated/X2cModule.java").text
+        def providerSource = file("$generated/dev/x2c/compatibility/generated/X2cResourceProviderImpl.java").text
+        def pluginMode = pluginPayloadMode
         if (pluginMode && r2Source.contains('getIdentifier(')) {
             throw new GradleException('Plugin mode R2 must use synthetic constants')
         }
-        if (!pluginMode && !r2Source.contains('context.getResources().getIdentifier(resName, resType, context.getPackageName())')) {
-            throw new GradleException('Normal integration R2 must bind IDs through host Resources#getIdentifier')
+        if (!pluginMode && (r2Source.contains('R2.init') || r2Source.contains('getResources().getIdentifier')
+                || r2Source.contains('X2cModule.init(context)')
+                || !r2Source.contains('return X2cModule.identifier(context, type, name)')
+                || !r2Source.contains('public static int compatibility_screen(Context context)'))) {
+            throw new GradleException('Normal integration R2 must be a stateless Context-based facade')
         }
-        if (!file("$buildDir/outputs/x2c/release/codegen.jar").isFile()) {
-            throw new GradleException('codegen.jar was not generated')
+        if (!pluginMode && (moduleSource.contains('R2.init(context)')
+                || !moduleSource.contains('private static volatile boolean initialized')
+                || !moduleSource.contains('if (!initialized) init(context)')
+                || !moduleSource.contains('created.getIdentifier("layout", "compatibility_screen")'))) {
+            throw new GradleException('Normal X2cModule must resolve layout IDs through its provider')
+        }
+        if (!pluginMode && (!providerSource.contains('public int getIdentifier(String type, String name)')
+                || !providerSource.contains('synchronized (identifiers)')
+                || !providerSource.contains('context.getResources().getIdentifier(name, type, context.getPackageName())')
+                || !providerSource.contains('identifiers.put(key, Integer.valueOf(identifier))'))) {
+            throw new GradleException('Normal provider must uniquely resolve and cache host resource IDs')
         }
         if (file("$buildDir/generated/sources/x2c").exists()) {
             throw new GradleException('Obsolete duplicate generated/sources/x2c directory still exists')
         }
-        def codegenJar = new java.util.jar.JarFile(file("$buildDir/outputs/x2c/release/codegen.jar"))
-        try {
-            def entries = java.util.Collections.list(codegenJar.entries())
-            if (entries.any { !it.directory && !it.name.endsWith('.class') }) {
-                throw new GradleException('codegen.jar contains a non-class entry')
+        if (pluginMode) {
+            if (!file("$buildDir/outputs/x2c/release/codegen.jar").isFile()) {
+                throw new GradleException('codegen.jar was not generated')
             }
-            if (entries.any { it.name ==~ /(?:.*\/)?R(?:\$.*)?\.class/ }) {
-                throw new GradleException('codegen.jar contains an Android R class')
+            def activityJarFile = file("$buildDir/outputs/x2c/release/activity-plugin.jar")
+            def activityReport = file("$buildDir/reports/x2c/release/activities.json")
+            if (!activityJarFile.isFile() || !activityReport.isFile()
+                    || !activityReport.text.contains('dev.x2c.compatibility.CompatibilityActivity')) {
+                throw new GradleException('Activity transformation output/report was not generated')
             }
-            if (!entries.any { it.name == 'dev/x2c/compatibility/x2c/X2cModuleBootstrap.class' }) {
-                throw new GradleException('codegen.jar does not contain the automatic module bootstrap')
+            def activityJar = new java.util.jar.JarFile(activityJarFile)
+            try {
+                def entries = java.util.Collections.list(activityJar.entries())
+                if (!entries.any { it.name == 'dev/x2c/generated/plugin/ComponentRegistry.class' }) {
+                    throw new GradleException('Generated component registry is missing')
+                }
+                def transformed = activityJar.getInputStream(
+                        activityJar.getJarEntry('dev/x2c/compatibility/CompatibilityActivity.class')).bytes
+                if (!new String(transformed, 'ISO-8859-1').contains(
+                        'dev/x2c/compatibility/base/CompatibilityBusinessBaseActivity')) {
+                    throw new GradleException('CompatibilityActivity business superclass was not retained')
+                }
+                def baseEntry = activityJar.getJarEntry(
+                        'dev/x2c/compatibility/base/CompatibilityBusinessBaseActivity.class')
+                if (baseEntry == null || !new String(
+                        activityJar.getInputStream(baseEntry).bytes, 'ISO-8859-1').contains(
+                        'dev/x2c/plugin/runtime/PluginActivity')) {
+                    throw new GradleException(
+                            'External BusinessBase dependency was not packaged and transformed')
+                }
+                if (!activityReport.text.contains('"dependencyClosure"')
+                        // AGP 3.5/7+/8.x expose the transformed project dependency as a JAR,
+                        // while AGP 4.x exposes the equivalent android-classes directory.
+                        || !activityReport.text.contains('"artifact": "business-base/')
+                        || !activityReport.text.contains('"type": "compileOnly-')) {
+                    throw new GradleException('Dependency closure report is missing')
+                }
+            } finally {
+                activityJar.close()
             }
-        } finally {
-            codegenJar.close()
+            def codegenJar = new java.util.jar.JarFile(file("$buildDir/outputs/x2c/release/codegen.jar"))
+            try {
+                def entries = java.util.Collections.list(codegenJar.entries())
+                if (entries.any { !it.directory && !it.name.endsWith('.class') }) {
+                    throw new GradleException('codegen.jar contains a non-class entry')
+                }
+                if (entries.any { it.name ==~ /(?:.*\/)?R(?:\$.*)?\.class/ }) {
+                    throw new GradleException('codegen.jar contains an Android R class')
+                }
+                if (!entries.any { it.name == 'dev/x2c/compatibility/x2c/X2cModuleBootstrap.class' }) {
+                    throw new GradleException('codegen.jar does not contain the automatic module bootstrap')
+                }
+            } finally {
+                codegenJar.close()
+            }
+        } else if (file("$buildDir/outputs/x2c/release/codegen.jar").exists()
+                || file("$buildDir/outputs/x2c/release/codegen-dex.jar").exists()) {
+            throw new GradleException('Normal mode must not produce class-only or DEX JAR artifacts')
         }
     }
 }
 
-verifyGeneratedSourceModel.dependsOn 'x2cReleaseJar'
+if (pluginPayloadMode) {
+    verifyGeneratedSourceModel.dependsOn 'x2cReleaseJar'
+    verifyGeneratedSourceModel.dependsOn 'x2cTransformReleaseActivities', 'x2cReleaseDexJar'
+}

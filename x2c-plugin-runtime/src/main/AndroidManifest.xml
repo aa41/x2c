@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name=".PluginContainerActivities$Standard0" android:exported="false" android:launchMode="standard" />
+        <activity android:name=".PluginContainerActivities$Standard1" android:exported="false" android:launchMode="standard" />
+        <activity android:name=".PluginContainerActivities$Standard2" android:exported="false" android:launchMode="standard" />
+        <activity android:name=".PluginContainerActivities$Standard3" android:exported="false" android:launchMode="standard" />
+        <activity android:name=".PluginContainerActivities$Standard4" android:exported="false" android:launchMode="standard" />
+        <activity android:name=".PluginContainerActivities$Standard5" android:exported="false" android:launchMode="standard" />
+        <activity android:name=".PluginContainerActivities$Standard6" android:exported="false" android:launchMode="standard" />
+        <activity android:name=".PluginContainerActivities$Standard7" android:exported="false" android:launchMode="standard" />
+
+        <activity android:name=".PluginContainerActivities$SingleTop0" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".PluginContainerActivities$SingleTop1" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".PluginContainerActivities$SingleTop2" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".PluginContainerActivities$SingleTop3" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".PluginContainerActivities$SingleTop4" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".PluginContainerActivities$SingleTop5" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".PluginContainerActivities$SingleTop6" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".PluginContainerActivities$SingleTop7" android:exported="false" android:launchMode="singleTop" />
+
+        <activity android:name=".PluginContainerActivities$SingleTask0" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name=".PluginContainerActivities$SingleTask1" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name=".PluginContainerActivities$SingleTask2" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name=".PluginContainerActivities$SingleTask3" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name=".PluginContainerActivities$SingleTask4" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name=".PluginContainerActivities$SingleTask5" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name=".PluginContainerActivities$SingleTask6" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name=".PluginContainerActivities$SingleTask7" android:exported="false" android:launchMode="singleTask" />
+
+        <activity android:name=".PluginContainerActivities$SingleInstance0" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name=".PluginContainerActivities$SingleInstance1" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name=".PluginContainerActivities$SingleInstance2" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name=".PluginContainerActivities$SingleInstance3" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name=".PluginContainerActivities$SingleInstance4" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name=".PluginContainerActivities$SingleInstance5" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name=".PluginContainerActivities$SingleInstance6" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name=".PluginContainerActivities$SingleInstance7" android:exported="false" android:launchMode="singleInstance" />
+
+        <service android:name=".PluginContainerServices$Slot0" android:exported="false" />
+        <service android:name=".PluginContainerServices$Slot1" android:exported="false" />
+        <service android:name=".PluginContainerServices$Slot2" android:exported="false" />
+        <service android:name=".PluginContainerServices$Slot3" android:exported="false" />
+        <service android:name=".PluginContainerServices$Slot4" android:exported="false" />
+        <service android:name=".PluginContainerServices$Slot5" android:exported="false" />
+        <service android:name=".PluginContainerServices$Slot6" android:exported="false" />
+        <service android:name=".PluginContainerServices$Slot7" android:exported="false" />
+
+        <receiver android:name=".PluginContainerReceiver" android:exported="false" />
+
+        <provider
+            android:name=".PluginContainerProvider"
+            android:authorities="${applicationId}.x2c.plugin.provider"
+            android:exported="false"
+            android:grantUriPermissions="false"
+            android:multiprocess="false" />
+    </application>
+</manifest>

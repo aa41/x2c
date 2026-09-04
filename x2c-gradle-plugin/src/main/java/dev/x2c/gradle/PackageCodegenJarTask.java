@@ -49,6 +49,11 @@ public abstract class PackageCodegenJarTask extends DefaultTask {
 
     @TaskAction
     public void packageJar() throws IOException {
+        if (!getPluginMode().get()) {
+            throw new GradleException(
+                    "x2c<Variant>Jar requires x2c.pluginMode=true. "
+                            + "Normal integration mode must publish and consume the AAR.");
+        }
         Map<String, byte[]> classes = new TreeMap<>();
 
         for (File directory : getInputDirectories().getFiles()) {
