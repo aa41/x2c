@@ -70,6 +70,8 @@ public final class ActivityJarTransformerSelfTest {
                     "dev/x2c/generated/plugin/ComponentRegistry.class"));
             verifyExternalDependencyClosure(root);
             verifyCompileOnlyBaseClosure(root);
+            verifyHostFallbackWithoutBusinessBase(root);
+            verifyCompileOnlyStructuralClosure(root);
             verifyFailClosed(root);
             System.out.println("ActivityJarTransformerSelfTest: passed");
         } finally {
@@ -178,19 +180,18 @@ public final class ActivityJarTransformerSelfTest {
         PackagedDependency metadata = result.dependencies.get(0);
         require("compile-only-business.jar".equals(metadata.artifactName)
                         && "compileOnly-jar".equals(metadata.artifactType)
-                        && metadata.classCount == 3,
+                        && metadata.classCount == 2,
                 "Selected compileOnly closure metadata is invalid");
         Map<String, byte[]> classes = readJar(output.toFile());
         verifySuperclass(classes.get("business/MarkedBusinessBaseActivity.class"),
                 "dev/x2c/plugin/runtime/PluginActivity",
                 "Marked compileOnly Activity root was not transformed");
-        require(classes.containsKey("business/BaseHelper.class"),
-                "Statically referenced compileOnly helper was not selected");
+        require(!classes.containsKey("business/BaseHelper.class"),
+                "Host-fallback dependency leaked into the plugin-private payload");
         require(classes.containsKey("business/ReflectiveHelper.class"),
                 "Explicit @X2cPluginBase.include helper was not selected");
         require(!classes.containsKey("business/UnrelatedHelper.class"),
                 "Unrelated compileOnly project class leaked into the payload");
-
         Path invalidPlugin = root.resolve("invalid-compile-only-plugin.jar");
         try (JarOutputStream jar = new JarOutputStream(
                 new BufferedOutputStream(new FileOutputStream(invalidPlugin.toFile())))) {
@@ -209,6 +210,60 @@ public final class ActivityJarTransformerSelfTest {
                 invalidCompileOnly,
                 root.resolve("invalid-compile-only-output.jar"),
                 "currently supports only Activity inheritance roots");
+    }
+
+    private static void verifyHostFallbackWithoutBusinessBase(Path root) throws Exception {
+        Path plugin = root.resolve("direct-host-fallback-plugin.jar");
+        try (JarOutputStream jar = new JarOutputStream(
+                new BufferedOutputStream(new FileOutputStream(plugin.toFile())))) {
+            add(jar, "sample/DirectHostDependencyActivity.class", activityWithHostDependency(
+                    "sample/DirectHostDependencyActivity", "business/DirectHostDependency"));
+        }
+        Path compileOnly = root.resolve("direct-host-dependency.jar");
+        try (JarOutputStream jar = new JarOutputStream(
+                new BufferedOutputStream(new FileOutputStream(compileOnly.toFile())))) {
+            add(jar, "business/DirectHostDependency.class",
+                    plainObject("business/DirectHostDependency"));
+        }
+        Path output = root.resolve("direct-host-fallback-output.jar");
+        ActivityTransformResult result = new ActivityJarTransformer().transform(
+                plugin.toFile(), Collections.<File>emptyList(),
+                Collections.singleton(compileOnly.toFile()), output.toFile(),
+                "sample.direct-host-fallback");
+        require(result.dependencies.isEmpty(),
+                "Direct host dependency was reported as a plugin-private dependency");
+        require(!readJar(output.toFile()).containsKey("business/DirectHostDependency.class"),
+                "Direct host dependency leaked into the plugin output");
+    }
+
+    private static void verifyCompileOnlyStructuralClosure(Path root) throws Exception {
+        Path plugin = root.resolve("structural-base-plugin.jar");
+        try (JarOutputStream jar = new JarOutputStream(
+                new BufferedOutputStream(new FileOutputStream(plugin.toFile())))) {
+            add(jar, "sample/StructuralActivity.class", activity(
+                    "sample/StructuralActivity", "business/StructuralBaseActivity", null));
+        }
+        Path compileOnly = root.resolve("structural-base.jar");
+        try (JarOutputStream jar = new JarOutputStream(
+                new BufferedOutputStream(new FileOutputStream(compileOnly.toFile())))) {
+            add(jar, "business/StructuralBaseActivity.class",
+                    markedBaseWithNest("business/StructuralBaseActivity",
+                            "business/StructuralBaseActivity$State"));
+            add(jar, "business/StructuralBaseActivity$State.class",
+                    nestedObject("business/StructuralBaseActivity$State",
+                            "business/StructuralBaseActivity"));
+        }
+        Path output = root.resolve("structural-base-output.jar");
+        ActivityTransformResult result = new ActivityJarTransformer().transform(
+                plugin.toFile(), Collections.<File>emptyList(),
+                Collections.singleton(compileOnly.toFile()), output.toFile(),
+                "sample.structural-base");
+        require(result.dependencies.size() == 1
+                        && result.dependencies.get(0).classCount == 2,
+                "BaseActivity nest must remain one plugin-private transform unit");
+        require(readJar(output.toFile()).containsKey(
+                        "business/StructuralBaseActivity$State.class"),
+                "BaseActivity structural nest member was not copied");
     }
 
     private static void writeInput(Path path) throws Exception {
@@ -368,6 +423,15 @@ public final class ActivityJarTransformerSelfTest {
         constructor.visitVarInsn(Opcodes.ALOAD, 0);
         constructor.visitMethodInsn(
                 Opcodes.INVOKESPECIAL, superName, "<init>", "()V", false);
+        if (helperName != null) {
+            constructor.visitVarInsn(Opcodes.ALOAD, 0);
+            constructor.visitTypeInsn(Opcodes.NEW, helperName);
+            constructor.visitInsn(Opcodes.DUP);
+            constructor.visitMethodInsn(
+                    Opcodes.INVOKESPECIAL, helperName, "<init>", "()V", false);
+            constructor.visitFieldInsn(
+                    Opcodes.PUTFIELD, name, "helper", "L" + helperName + ";");
+        }
         constructor.visitInsn(Opcodes.RETURN);
         constructor.visitMaxs(0, 0);
         constructor.visitEnd();
@@ -381,6 +445,72 @@ public final class ActivityJarTransformerSelfTest {
                 name, null, "java/lang/Object", null);
         MethodVisitor constructor = writer.visitMethod(
                 Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        constructor.visitInsn(Opcodes.RETURN);
+        constructor.visitMaxs(0, 0);
+        constructor.visitEnd();
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
+    private static byte[] activityWithHostDependency(String name, String hostDependency) {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
+                name, null, "android/app/Activity", null);
+        writer.visitAnnotation("Ldev/x2c/plugin/api/X2cPluginActivity;", false).visitEnd();
+        writer.visitField(Opcodes.ACC_PRIVATE, "hostDependency", "L" + hostDependency + ";",
+                null, null).visitEnd();
+        MethodVisitor constructor = writer.visitMethod(
+                Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "android/app/Activity", "<init>", "()V", false);
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitTypeInsn(Opcodes.NEW, hostDependency);
+        constructor.visitInsn(Opcodes.DUP);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, hostDependency, "<init>", "()V", false);
+        constructor.visitFieldInsn(
+                Opcodes.PUTFIELD, name, "hostDependency", "L" + hostDependency + ";");
+        constructor.visitInsn(Opcodes.RETURN);
+        constructor.visitMaxs(0, 0);
+        constructor.visitEnd();
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
+    private static byte[] markedBaseWithNest(String name, String member) {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V11, Opcodes.ACC_PUBLIC | Opcodes.ACC_ABSTRACT,
+                name, null, "android/app/Activity", null);
+        writer.visitNestMember(member);
+        writer.visitInnerClass(member, name, "State", Opcodes.ACC_STATIC);
+        writer.visitAnnotation("Ldev/x2c/plugin/api/X2cPluginBase;", false).visitEnd();
+        MethodVisitor constructor = writer.visitMethod(
+                Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "android/app/Activity", "<init>", "()V", false);
+        constructor.visitInsn(Opcodes.RETURN);
+        constructor.visitMaxs(0, 0);
+        constructor.visitEnd();
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
+    private static byte[] nestedObject(String name, String host) {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V11, Opcodes.ACC_FINAL,
+                name, null, "java/lang/Object", null);
+        writer.visitNestHost(host);
+        writer.visitInnerClass(name, host, "State", Opcodes.ACC_STATIC);
+        MethodVisitor constructor = writer.visitMethod(
+                Opcodes.ACC_PRIVATE, "<init>", "()V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(Opcodes.ALOAD, 0);
         constructor.visitMethodInsn(

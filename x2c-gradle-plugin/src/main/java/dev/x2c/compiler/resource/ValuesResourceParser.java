@@ -20,17 +20,24 @@ final class ValuesResourceParser {
 
     private ValuesResourceParser() {}
 
-    static void parseValues(ResourceFile source, Model model) {
+    static void parseValues(ResourceFile source, Model model, boolean pluginMode) {
         Document document = parseXml(source.file);
-        rejectThemeSyntax(source.file, document);
+        if (pluginMode) {
+            rejectThemeSyntax(source.file, document);
+        }
         Element root = document.getDocumentElement();
         requireTag(source.file, root, "resources");
         rejectAttributes(source.file, root, setOf());
         for (Element element : childElements(root)) {
             String type = element.getTagName();
             if (UNSUPPORTED_STYLE_RESOURCE_TYPES.contains(type)) {
-                throw fail(source.file, "style/theme/styleable resources are not supported in strict JAR mode: <"
-                        + type + ">");
+                if (pluginMode) {
+                    throw fail(source.file, "style/theme/styleable resources are not supported in strict JAR mode: <"
+                            + type + ">");
+                }
+                // The normal AAR keeps the original resource file for AAPT2. X2C does not need to
+                // model declarations that are only used to make custom XML attributes linkable.
+                continue;
             }
             String name = requireResourceName(source.file, element);
             switch (type) {
@@ -92,7 +99,13 @@ final class ValuesResourceParser {
                     putUnique(model.fractions, name, parseFraction(source.file, element.getTextContent()),
                             source.file, "fraction");
                     break;
-                default: throw fail(source.file, "Unsupported values resource type: " + type);
+                default:
+                    if (pluginMode) {
+                        throw fail(source.file, "Unsupported values resource type: " + type);
+                    }
+                    // Preserve normal-AAR-only values through AAPT2 without pretending X2C can
+                    // expose them from the generated resource provider.
+                    break;
             }
         }
     }

@@ -56,9 +56,9 @@ final class PluginDependencyClosure {
             readDependency(artifact, result);
         }
 
-        List<CompileOnlyBaseClosure.SelectedArtifact> selected =
+        List<CompileOnlyBaseClosure.SelectedArtifact> selection =
                 CompileOnlyBaseClosure.select(compileOnlyArtifacts, result.classes);
-        for (CompileOnlyBaseClosure.SelectedArtifact artifact : selected) {
+        for (CompileOnlyBaseClosure.SelectedArtifact artifact : selection) {
             TreeMap<String, byte[]> artifactClasses = new TreeMap<String, byte[]>();
             for (Map.Entry<String, byte[]> entry : artifact.classes.entrySet()) {
                 putClass(entry.getKey(), entry.getValue(), artifact.displayName, true,

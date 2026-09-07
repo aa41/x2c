@@ -47,7 +47,8 @@
 - class contract verifier: plugin 模式拒绝业务 bytecode 中的非系统 `R`/`R$*`、`TypedArray/styleable` 和动态资源查询；normal 模式允许 `Resources.getIdentifier` 以支持宿主资源绑定，其余约束保持
 - 可选 DEX JAR: 使用 Android SDK D8 生成 `classes.dex`
 - 插件组件公共根：`x2c-plugin-base` 由宿主唯一持有；业务 `BaseActivity` 可用
-  `@X2cPluginBase` 从 `compileOnly project` 精确复制为插件私有闭包，再由 ASM 改写
+  `@X2cPluginBase` 从 `compileOnly project` 提取最小插件私有转换单元；未复制的
+  analytics/账户/网络等业务依赖由 PluginClassLoader 自动回退到宿主 ClassLoader
 - 组件代理：四种 Activity launchMode、started/bound Service、normal/ordered Receiver、虚拟 ContentProvider 安全子集
 
 通用 View 属性覆盖：ID、宽高、weight、gravity、margin、padding、background/tint/foreground、visibility、enabled/click/focus/state、content description/tag/tooltip/transition、alpha/elevation/rotation/scale/translation/min size、layout direction、over-scroll 和常用 accessibility 属性。TextView 家族增加文本、hint、行数、字体样式、ellipsize、inputType/IME；ImageView 家族增加 src/scale/tint；CompoundButton、ProgressBar/SeekBar/RatingBar 也有对应 typed setter。
@@ -74,7 +75,7 @@ dependencies {
     compileOnly("dev.x2c:x2c-runtime:0.1.0-SNAPSHOT")
     compileOnly("dev.x2c:x2c-plugin-runtime:0.1.0-SNAPSHOT")
     compileOnly("dev.x2c:x2c-plugin-base:0.1.0-SNAPSHOT")
-    // 可选：较大业务 project 无需拆 module；只复制被入口继承且标注的 base 闭包。
+    // 可选：较大业务 project 无需拆 module；只复制被入口继承的最小 base 转换单元。
     compileOnly(project(":business-base"))
 }
 
@@ -121,16 +122,25 @@ framework 基类。原生宿主 Activity 不能继承 `BasePluginActivity`；两
 
 插件源码并非必须直接继承 `BasePluginActivity`。在业务 base project 中给 Activity 根添加
 `@X2cPluginBase`，并让插件以 `compileOnly(project(":business-base"))` 编译；组件插件会从 compile classpath
-中只选择实际出现在插件 Activity 父类链上的标注根、其父类以及同一 artifact 内可由字节码确定的 class
-依赖，复制进 payload 后统一转换。反射专用依赖可通过 `@X2cPluginBase(include = {...})` 显式补充。
+中只选择实际出现在插件 Activity 父类链上的标注根、Activity 父类以及必须同 ClassLoader 的
+nest/内部类，复制进 payload 后统一转换。其他插件私有实现必须通过
+`@X2cPluginBase(include = {...})` 显式补充；未复制的 compileOnly 业务引用保持原字节码引用，运行时在
+插件 JAR 查找失败后直接由宿主 ClassLoader 加载，无需额外注解或初始化。
 因此同一份 library 可以由宿主 `implementation` 得到普通 `BusinessBaseActivity -> Activity`，插件则把
 私有副本改为 `BusinessBaseActivity -> PluginActivity`。无需把业务 project 拆成只有一个 Activity 的 module；
-未被闭包引用的业务 class 不会进入 payload。两份 class 的 identity、static 字段和单例仍然隔离。
+analytics/账户/网络 SDK 不会因为 BaseActivity 的普通引用而自动进入 payload。BaseActivity 本身的 identity
+和静态字段仍按插件隔离；未进入 payload 的依赖由所有插件共享宿主 identity 和静态状态。
+
+跨 ClassLoader 使用的类和成员应保持 `public`。宿主必须实际包含插件运行时需要的 compileOnly 依赖；
+否则首次解析该类或成员时会正常抛出 `ClassNotFoundException`、`NoClassDefFoundError` 或
+`NoSuchMethodError`。由于宿主 shrinker 无法看到服务端后发插件的调用，生产应用应自行提供相应 keep rules
+和版本兼容策略。
 
 第一阶段会拒绝选中闭包中的 Android resources API、`R`/`TypedArray`、JNI、重复 class、宿主 X2C runtime
 副本以及 AndroidX/AppCompat/Material。未标 `@X2cPluginBase`、因而只存在于宿主 ClassLoader 的普通
 BaseActivity 仍不能作为插件父类；平台和 X2C runtime/API/base/loader 继续 parent-first。每个依赖 class 集的 SHA-256、
-数量和 ownership 会进入组件构建报告，最终签名 descriptor 的 payload SHA-256 会覆盖转换后的完整闭包。
+数量和 ownership 会进入组件构建报告；签名 descriptor 只绑定组件 runtime ABI、依赖闭包摘要和 payload
+摘要，不枚举或限制插件可引用的宿主业务类。
 
 ### 两种资源 ID 模式
 
@@ -142,8 +152,9 @@ BaseActivity 仍不能作为插件父类；平台和 X2C runtime/API/base/loader
 完整的命令行切换、依赖/Manifest 检查表和回归命令见
 [pluginMode 安全切换指南](docs/PLUGIN_MODE.md)。
 
-两项误操作会被硬性拒绝：`pluginMode=false` 不能保留 `dev.x2c.activity-plugin`，也不能执行
-`x2c<Variant>Jar`/`x2c<Variant>DexJar`。动态组件插件同一 `pluginId` 在进程内只允许安装一次；热卸载和同进程替换因无法
+`dev.x2c.activity-plugin` 可以保留在双模式 module 中：normal 模式不会执行组件转换。若误调用
+`x2cTransform<Variant>Activities`、`x2c<Variant>Jar` 或 `x2c<Variant>DexJar`，仍会硬失败；统一入口
+`x2cBuild<Variant>` 会根据 `pluginMode` 只选择正确产物。动态组件插件同一 `pluginId` 在进程内只允许安装一次；热卸载和同进程替换因无法
 证明所有 framework 生命周期均已结束而 fail closed，升级必须在新进程中完成。
 
 normal 模式不再生成静态可变 ID 字段，也没有 `R2.init()`。`X2cResourceProviderImpl` 是唯一宿主 ID
@@ -201,7 +212,25 @@ x2cTransformReleaseActivities
                     -> build/outputs/x2c/release/activity-plugin.jar
                     -> build/reports/x2c/release/activities.json
 x2cReleaseDexJar    -> build/outputs/x2c/release/codegen-dex.jar
+x2cBuildRelease     -> pluginMode=true: x2cReleaseDexJar
+                    -> pluginMode=false: assembleRelease/AAR
 ```
+
+推荐使用统一入口，避免 CI 自己拼接错误任务：
+
+```bash
+# Gradle：同一个任务，根据 property 选择可加载 DEX JAR 或普通 AAR
+./gradlew :library:x2cBuildRelease -Px2c.pluginMode=true
+./gradlew :library:x2cBuildRelease -Px2c.pluginMode=false
+
+# CLI wrapper：会额外校验报告模式和最终压缩包结构
+./scripts/build-x2c-artifact.sh --module :library --mode plugin --variant release
+./scripts/build-x2c-artifact.sh --module :library --mode normal --variant release
+```
+
+脚本也接受 `X2C_MODULE`、`X2C_BUILD_MODE`、`X2C_VARIANT` 环境变量；显式 CLI 参数优先。
+plugin 输出是 Android 可直接交给 `DexClassLoader` 的 `codegen-dex.jar`（内部只有 `classes.dex`），normal
+输出是保留 Manifest/resource table/本地资源的 AAR。
 
 `x2cGenerateRelease` 的规范源码目录是 `build/generated/java/x2cGenerateRelease/`；debug 对应
 `build/generated/java/x2cGenerateDebug/`。两个 variant 不共享生成目录，也不会再同时留下旧的

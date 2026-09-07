@@ -31,7 +31,7 @@ android {
 
 x2c {
     // pluginMode defaults to true and can be supplied with -Px2c.pluginMode=true.
-    // false is rejected while the component transform plugin remains applied.
+    // This fixture intentionally keeps plugin-only dependency and Manifest configuration.
     pluginId.set("dev.x2c.fixture.component-showcase")
     generatedPackage.set("dev.x2c.fixture.secondary.generated")
     assetLockFile.set(layout.projectDirectory.file("x2c-assets.lock.json"))

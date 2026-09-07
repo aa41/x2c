@@ -39,7 +39,7 @@ import org.objectweb.asm.TypePath;
 import org.objectweb.asm.signature.SignatureReader;
 import org.objectweb.asm.signature.SignatureVisitor;
 
-/** Selects marked Activity bases from compile-only artifacts without embedding the whole project. */
+/** Selects minimal marked Activity transform units from compile-only inputs. */
 final class CompileOnlyBaseClosure {
     private static final String MARKER = "Ldev/x2c/plugin/api/X2cPluginBase;";
     private static final String FRAMEWORK_ACTIVITY = "android/app/Activity";
@@ -78,21 +78,40 @@ final class CompileOnlyBaseClosure {
         for (String entry : new TreeSet<String>(packagedClasses.keySet())) {
             selectMarkedAncestorChain(entry, packagedClasses, candidates, selected);
         }
-        if (selected.isEmpty()) return Collections.emptyList();
+        // A transformed class and its nest/anonymous/inner implementation classes form one
+        // runtime unit. They must share a defining ClassLoader for private and package access.
+        addStructuralCompanions(selected, candidates);
 
-        Queue<Candidate> queue = new ArrayDeque<Candidate>(selected);
-        while (!queue.isEmpty()) {
-            Candidate owner = queue.remove();
-            for (String reference : owner.info.references) {
-                Candidate dependency = candidates.get(reference + ".class");
-                // A marked project is a selection boundary. Other compileOnly artifacts remain
-                // host-provided unless their own marked Activity hierarchy is selected.
-                if (dependency != null && dependency.artifact == owner.artifact
-                        && selected.add(dependency)) {
-                    queue.add(dependency);
+        // Ordinary references stay out of the payload and resolve through the host ClassLoader
+        // fallback. @X2cPluginBase.include is the explicit opt-in for plugin-private helper
+        // implementations and brings that helper's same-artifact dependency closure.
+        Queue<Candidate> privateQueue = new ArrayDeque<Candidate>();
+        for (Candidate owner : new ArrayList<Candidate>(selected)) {
+            for (String include : owner.info.explicitIncludes) {
+                Candidate dependency = candidates.get(include + ".class");
+                if (dependency == null) {
+                    if (!packagedClasses.containsKey(include + ".class")) {
+                        throw new IllegalStateException(
+                                "@X2cPluginBase.include class is not available on the plugin "
+                                        + "compile classpath: " + include.replace('/', '.'));
+                    }
+                } else if (selected.add(dependency)) {
+                    privateQueue.add(dependency);
                 }
             }
         }
+        while (!privateQueue.isEmpty()) {
+            Candidate owner = privateQueue.remove();
+            for (String reference : owner.info.references) {
+                Candidate dependency = candidates.get(reference + ".class");
+                if (dependency != null && dependency.artifact == owner.artifact
+                        && selected.add(dependency)) {
+                    privateQueue.add(dependency);
+                }
+            }
+        }
+        addStructuralCompanions(selected, candidates);
+        if (selected.isEmpty()) return Collections.emptyList();
 
         Map<Artifact, TreeMap<String, byte[]>> byArtifact =
                 new LinkedHashMap<Artifact, TreeMap<String, byte[]>>();
@@ -119,6 +138,37 @@ final class CompileOnlyBaseClosure {
                     artifact.displayName, "compileOnly-" + artifact.type, entry.getValue()));
         }
         return result;
+    }
+
+    private static void addStructuralCompanions(
+            Set<Candidate> selected, Map<String, Candidate> candidates) {
+        boolean changed;
+        do {
+            changed = false;
+            for (Candidate owner : new ArrayList<Candidate>(selected)) {
+                for (String member : owner.info.structuralMembers) {
+                    Candidate dependency = candidates.get(member + ".class");
+                    if (dependency != null && dependency.artifact == owner.artifact
+                            && selected.add(dependency)) {
+                        changed = true;
+                    }
+                }
+            }
+            for (Candidate candidate : candidates.values()) {
+                if (candidate.info.nestHost != null
+                        && containsEntry(selected, candidate.info.nestHost + ".class")
+                        && selected.add(candidate)) {
+                    changed = true;
+                }
+            }
+        } while (changed);
+    }
+
+    private static boolean containsEntry(Set<Candidate> candidates, String entry) {
+        for (Candidate candidate : candidates) {
+            if (candidate.entry.equals(entry)) return true;
+        }
+        return false;
     }
 
     private static void selectMarkedAncestorChain(
@@ -300,15 +350,19 @@ final class CompileOnlyBaseClosure {
         @Override public void visit(
                 int version, int access, String name, String signature,
                 String superName, String[] interfaces) {
+            info.name = name;
             info.superName = superName;
             addInternal(info.references, superName);
             if (interfaces != null) {
-                for (String value : interfaces) addInternal(info.references, value);
+                for (String value : interfaces) {
+                    addInternal(info.references, value);
+                }
             }
             addSignature(info.references, signature, false);
         }
 
         @Override public void visitNestHost(String nestHost) {
+            info.nestHost = nestHost;
             addInternal(info.references, nestHost);
         }
 
@@ -318,8 +372,26 @@ final class CompileOnlyBaseClosure {
         }
 
         @Override public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-            if (MARKER.equals(descriptor)) info.markedBase = true;
             addDescriptor(info.references, descriptor);
+            if (MARKER.equals(descriptor)) {
+                info.markedBase = true;
+                return new AnnotationVisitor(Opcodes.ASM9) {
+                    @Override public AnnotationVisitor visitArray(String name) {
+                        if (!"include".equals(name)) return annotationVisitor(info.references);
+                        return new AnnotationVisitor(Opcodes.ASM9) {
+                            @Override public void visit(String ignored, Object value) {
+                                addConstant(info.references, value);
+                                if (value instanceof Type) {
+                                    Type type = (Type) value;
+                                    if (type.getSort() == Type.OBJECT) {
+                                        info.explicitIncludes.add(type.getInternalName());
+                                    }
+                                }
+                            }
+                        };
+                    }
+                };
+            }
             return annotationVisitor(info.references);
         }
 
@@ -330,6 +402,7 @@ final class CompileOnlyBaseClosure {
         }
 
         @Override public void visitNestMember(String nestMember) {
+            info.structuralMembers.add(nestMember);
             addInternal(info.references, nestMember);
         }
 
@@ -341,6 +414,9 @@ final class CompileOnlyBaseClosure {
                 String name, String outerName, String innerName, int access) {
             addInternal(info.references, name);
             addInternal(info.references, outerName);
+            if (info.name != null && info.name.equals(outerName)) {
+                info.structuralMembers.add(name);
+            }
         }
 
         @Override public RecordComponentVisitor visitRecordComponent(
@@ -634,9 +710,13 @@ final class CompileOnlyBaseClosure {
     }
 
     private static final class ClassInfo {
+        String name;
         String superName;
+        String nestHost;
         boolean markedBase;
         final Set<String> references = new TreeSet<String>();
+        final Set<String> explicitIncludes = new TreeSet<String>();
+        final Set<String> structuralMembers = new TreeSet<String>();
     }
 
     private static final class CandidateReadException extends RuntimeException {

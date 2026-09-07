@@ -29,7 +29,7 @@ export LANG=C
     :x2c-plugin-runtime:check \
     :fixtures:business-base:assembleRelease \
     :fixtures:producer:x2cReleaseJar \
-    :fixtures:producer:x2cReleaseDexJar \
+    :fixtures:producer:x2cBuildRelease \
     :fixtures:producer-secondary:x2cReleaseJar \
     :fixtures:producer-secondary:x2cReleaseDexJar \
     :fixtures:consumer:assembleRelease \
@@ -159,6 +159,18 @@ if ! javap -classpath "$task_activity_jar" dev.x2c.fixture.producer.DemoActivity
     echo "shared-source BusinessBase or host-owned component base boundary is missing" >&2
     exit 1
 fi
+for task_transformed_jar in "$task_activity_jar" "$task_secondary_activity_jar"; do
+    if ! jar tf "$task_transformed_jar" \
+            | rg '^dev/x2c/fixture/businessbase/BusinessBaseActivity\.class$' >/dev/null; then
+        echo "plugin-private BusinessBaseActivity transform unit is missing" >&2
+        exit 1
+    fi
+    if jar tf "$task_transformed_jar" \
+            | rg '^dev/x2c/fixture/businessbase/analytics/' >/dev/null; then
+        echo "host-owned analytics leaked into a plugin payload" >&2
+        exit 1
+    fi
+done
 if ! javap -classpath "$task_business_base_classes" \
         dev.x2c.fixture.businessbase.BusinessBaseActivity \
         | rg 'extends android\.app\.Activity' >/dev/null; then
@@ -202,12 +214,16 @@ if ! rg -q '"pluginId": "dev\.x2c\.fixture\.layout-showcase"' "$task_activity_re
 fi
 if ! rg -q '"artifact": "business-base/classes\.jar"' "$task_activity_report" \
     || ! rg -q '"type": "compileOnly-jar"' "$task_activity_report" \
+    || ! rg -q '"classes": 1' "$task_activity_report" \
     || ! rg -q '"runtimeAbiVersion": 1' "$task_activity_report" \
-    || ! rg -q '"dependencyClasses": "plugin-private"' "$task_activity_report" \
+    || ! rg -q '"dependencyClasses": "explicit-plugin-private"' "$task_activity_report" \
+    || ! rg -q '"compileOnlyReferences": "host-fallback"' "$task_activity_report" \
     || ! rg -q '"androidxAndResourceAars": "rejected-in-phase-1"' "$task_activity_report" \
     || ! rg -q '"artifact": "business-base/classes\.jar"' \
         "$task_secondary_activity_report" \
-    || ! rg -q '"type": "compileOnly-jar"' "$task_secondary_activity_report"; then
+    || ! rg -q '"type": "compileOnly-jar"' "$task_secondary_activity_report" \
+    || ! rg -q '"classes": 1' "$task_secondary_activity_report" \
+    || ! rg -q '"compileOnlyReferences": "host-fallback"' "$task_secondary_activity_report"; then
     echo "generated component reports do not describe the dependency ownership closure" >&2
     exit 1
 fi
@@ -236,14 +252,14 @@ if unzip -Z1 "$task_apk" | awk '
     exit 1
 fi
 task_dex_hash_embedded=$(unzip -p "$task_apk" assets/x2c-layout-showcase/codegen-dex.jar | shasum -a 256 | awk '{ print $1 }')
-task_dex_hash_declared=$(unzip -p "$task_apk" assets/x2c-layout-showcase/codegen-dex.descriptor | sed -n '7p')
+task_dex_hash_declared=$(unzip -p "$task_apk" assets/x2c-layout-showcase/codegen-dex.descriptor | tail -n 1)
 task_dex_hash_actual=$(shasum -a 256 "$task_dex_jar" | awk '{ print $1 }')
 if [[ "$task_dex_hash_embedded" != "$task_dex_hash_actual" || "$task_dex_hash_declared" != "$task_dex_hash_actual" ]]; then
     echo "consumer APK dynamic DEX payload does not match codegen-dex.jar" >&2
     exit 1
 fi
 task_secondary_hash_embedded=$(unzip -p "$task_apk" assets/x2c-component-showcase/codegen-dex.jar | shasum -a 256 | awk '{ print $1 }')
-task_secondary_hash_declared=$(unzip -p "$task_apk" assets/x2c-component-showcase/codegen-dex.descriptor | sed -n '7p')
+task_secondary_hash_declared=$(unzip -p "$task_apk" assets/x2c-component-showcase/codegen-dex.descriptor | tail -n 1)
 task_secondary_hash_actual=$(shasum -a 256 "$task_secondary_dex_jar" | awk '{ print $1 }')
 if [[ "$task_secondary_hash_embedded" != "$task_secondary_hash_actual" \
     || "$task_secondary_hash_declared" != "$task_secondary_hash_actual" ]]; then

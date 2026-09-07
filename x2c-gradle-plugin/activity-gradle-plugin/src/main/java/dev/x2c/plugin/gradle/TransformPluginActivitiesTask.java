@@ -161,7 +161,8 @@ public abstract class TransformPluginActivitiesTask extends DefaultTask {
         }
         json.append("  ],\n")
                 .append("  \"ownership\": {\n")
-                .append("    \"dependencyClasses\": \"plugin-private\",\n")
+                .append("    \"dependencyClasses\": \"explicit-plugin-private\",\n")
+                .append("    \"compileOnlyReferences\": \"host-fallback\",\n")
                 .append("    \"platformAndX2cRuntime\": \"parent-first\",\n")
                 .append("    \"androidxAndResourceAars\": \"rejected-in-phase-1\"\n")
                 .append("  }\n");

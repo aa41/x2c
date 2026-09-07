@@ -16,6 +16,7 @@ public final class StatusPillView extends View {
     private float opacityFactor;
     private Drawable panelDrawable;
     private ImageAsset heroAsset;
+    private Drawable localHeroDrawable;
 
     public StatusPillView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
@@ -51,5 +52,12 @@ public final class StatusPillView extends View {
 
     public void setHeroAsset(ImageAsset heroAsset) {
         this.heroAsset = heroAsset;
+        this.localHeroDrawable = null;
+    }
+
+    /** Normal-AAR overload for the same logical IMAGE_ASSET custom attribute. */
+    public void setHeroAsset(Drawable localHeroDrawable) {
+        this.localHeroDrawable = localHeroDrawable;
+        this.heroAsset = null;
     }
 }

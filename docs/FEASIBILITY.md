@@ -48,9 +48,10 @@ codegen.jar
 - JVM probe 已在普通 JDK `URLClassLoader` 中执行并返回 `PASS checksum=175`；同一套内部类、局部类、匿名类、lambda、方法引用、泛型、record、switch、异常、同步与逻辑运算代码已通过 D8。
 - producer `DemoActivity` 只存在于 DEX JAR，不存在于 producer/consumer Manifest。当前 fixture 已使用独立
   `business-base` Android library：宿主 `implementation` 副本保持 `BusinessBaseActivity -> Activity`，两个
-  插件从 `compileOnly project` 精确复制 `@X2cPluginBase` 闭包并转换为
-  `BusinessBaseActivity -> PluginActivity`。编译器自测同时覆盖 same-JAR 三层链、标注 compileOnly
-  base/helper/include、非 Activity 标注拒绝、外部 runtime dependency 链、重复 class、resource AAR 和
+  插件从 `compileOnly project` 只复制 `@X2cPluginBase` 最小转换单元并转换为
+  `BusinessBaseActivity -> PluginActivity`；未复制的 analytics 由两个 PluginClassLoader 缺失回退到同一个
+  宿主 ClassLoader。编译器自测同时覆盖 same-JAR 三层链、标注 compileOnly
+  base/显式 include/普通宿主依赖 fallback、非 Activity 标注拒绝、外部 runtime dependency链、重复 class、resource AAR 和
   AndroidX fail-closed。generated registry 直接构造 delegate；
   宿主 Manifest 只有 4 种 launchMode × 8 个
   固定代理容器，不再使用 `AppComponentFactory`。loader 对插件业务类 plugin-first、miss 后回退宿主，对
@@ -58,8 +59,8 @@ codegen.jar
   class 精确取回对应 `X2cResources`。
 - JAR 打包前会解析 class constant pool，拒绝非系统 `R`/`R$*`、`TypedArray`、`obtainStyledAttributes`、`Resources.obtainAttributes/getIdentifier`；不会仅靠“产物里没有 R.class”判断安全。
 - producer 的 JAR/DEX 任务已验证 configuration cache 可存储并在下一次构建复用。
-- 安装器对 canonical pluginId/versionCode/versionName/runtime ABI/dependency closure SHA-256/payload
-  SHA-256 descriptor 执行 RSA 验签；在动态代码落盘前拒绝 runtime ABI 不匹配，写入前设为只读，并拒绝
+- 安装器对 canonical pluginId/versionCode/versionName/runtime ABI/dependency closure SHA-256 和
+  payload SHA-256 descriptor 执行 RSA 验签；在动态代码落盘前拒绝 runtime ABI 不匹配，写入前设为只读，并拒绝
   降级或相同 versionCode 的内容替换。
 - 全部源码中的进程级 `X2C.init(context)` 调用只存在于 plugin demo 的 `HostApplication` 和 normal demo
   的 `NormalApplication`，两者均位于 `attachBaseContext`。loader、业务 Activity、generated bootstrap/module

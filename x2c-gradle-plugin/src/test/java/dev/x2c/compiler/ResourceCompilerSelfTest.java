@@ -937,16 +937,46 @@ public final class ResourceCompilerSelfTest {
     private void keepsBitmapHostBackedInNormalMode() throws Exception {
         Path res = temporaryDirectory.resolve("res");
         writePng(res.resolve("drawable/local_product.png"));
+        write(res.resolve("values/normal-only.xml"), """
+                <resources>
+                    <attr name="heroAsset" format="reference" />
+                    <declare-styleable name="ImageConsumer">
+                        <attr name="heroAsset" />
+                    </declare-styleable>
+                    <style name="HostTheme">
+                        <item name="android:textColor">?android:attr/textColorPrimary</item>
+                    </style>
+                </resources>
+                """);
         write(res.resolve("layout/product.xml"), """
                 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                    xmlns:app="http://schemas.android.com/apk/res-auto"
                     android:layout_width="match_parent" android:layout_height="match_parent">
                     <ImageView
                         android:layout_width="match_parent"
                         android:layout_height="120dp"
                         android:src="@drawable/local_product" />
+                    <sample.ImageConsumer
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:heroAsset="@drawable/local_product" />
                 </FrameLayout>
                 """);
-        compile(res, null, null, false);
+        Path customViews = temporaryDirectory.resolve("custom-views.json");
+        write(customViews, """
+                {
+                  "schema": 1,
+                  "views": [{
+                    "tag": "sample.ImageConsumer",
+                    "attributes": [{
+                      "name": "heroAsset",
+                      "setter": "setHeroAsset",
+                      "type": "IMAGE_ASSET"
+                    }]
+                  }]
+                }
+                """);
+        compile(res, null, customViews, false);
 
         Path generated = temporaryDirectory.resolve("generated/sample/generated");
         String layout = Files.readString(generated.resolve("X2cLayouts.java"));
@@ -954,6 +984,8 @@ public final class ResourceCompilerSelfTest {
         String module = Files.readString(generated.resolve("X2cModule.java"));
         assertContains(layout,
                 "context.getResources().getDrawable(X2cModule.identifier(\"drawable\", \"local_product\"), context.getTheme())");
+        assertContains(layout,
+                ".setHeroAsset(context.getResources().getDrawable(X2cModule.identifier(\"drawable\", \"local_product\"), context.getTheme()))");
         assertContains(provider,
                 "getDrawable(getIdentifier(\"drawable\", name), context.getTheme())");
         assertContains(module, "new X2cResourceProviderImpl(context)");

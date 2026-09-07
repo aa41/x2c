@@ -51,13 +51,14 @@ PluginDetailActivity -> dev.x2c.plugin.base.BasePluginActivity -> PluginActivity
 需要宿主和插件共享正常 `BaseActivity extends Activity` 源码时，在业务 project 的根上标记：
 
 ```java
-@X2cPluginBase(include = {ReflectiveDependency.class})
+@X2cPluginBase(include = {PluginPrivateDependency.class})
 public abstract class BusinessBaseActivity extends Activity { /* ... */ }
 ```
 
 插件使用 `compileOnly(project(":business-base"))`，宿主使用 `implementation`。构建器只复制被插件入口
-真实继承的标注 base 链和同 artifact 内的静态 class 依赖；`include` 只用于补充反射/字符串类名等静态分析
-不可见依赖。未标注的仅宿主 BaseActivity、AppCompat/FragmentActivity/ComponentActivity 仍会在继承闭包
+真实继承的标注 base 链、nest/内部实现类以及 `include` 明确声明的插件私有闭包。普通 compileOnly 引用
+不会复制进 payload；插件 ClassLoader 查找不到时会自动交给宿主 ClassLoader。仅宿主
+BaseActivity、AppCompat/FragmentActivity/ComponentActivity 仍会在 Activity 继承闭包
 无法闭合时构建失败。遗漏入口注解、单
 launchMode 超过 8 个、未知组件或不安全 final API 同样 fail closed。
 
@@ -65,8 +66,8 @@ marker 来自 `x2c-plugin-api`，业务 base project 对它使用 `compileOnly`�
 
 第一阶段依赖闭包接受传递 JAR、classes 目录和无资源 Android library classes。Android resources、Java
 resources、assets、JNI、重复 class、X2C 宿主包以及 AndroidX/AppCompat/Material 会在构建期拒绝。转换报告
-记录每个依赖的 class 数量、canonical class SHA-256 和 plugin-private ownership；最终签名 payload digest
-覆盖 module、依赖和 generated registry。
+记录每个插件私有依赖的 class 数量、canonical class SHA-256 和 compileOnly host-fallback 策略；
+最终签名 payload digest 覆盖 module、依赖和 generated registry。
 
 因此这里有两种不同的“共用 BaseActivity”语义：
 
@@ -94,7 +95,8 @@ BaseActivity。Shadow 的插件基类代码和生命周期可以执行，是因�
 | `x2c-runtime` | 宿主 | X2C module/resource registry、图片 SPI、plugin-first/host-fallback ClassLoader |
 
 插件 payload 不得打入 `x2c-runtime`、`x2c-plugin-api/base/runtime/loader`。`PluginClassLoader` 对这些包和
-Android/Java 平台包强制 parent-first，避免 singleton 与类型身份分裂；业务类 plugin-first，miss 后回退宿主。
+Android/Java 平台包强制 parent-first，避免 singleton 与类型身份分裂；其余业务类 plugin-first，插件中
+不存在时自然回退宿主。因此宿主业务能力不需要额外注解，但如果同名类也被显式打进插件，则插件副本优先。
 
 宿主在 `Application.attachBaseContext` 中调用且只调用一次 `X2C.init(base)`；若不需要在该阶段安装插件，
 也可放到 `Application.onCreate`。插件安装器、generated `X2cModule`、Activity 和资源访问只验证宿主已经
@@ -157,7 +159,7 @@ Activity 构造函数/字段初始化阶段不得访问 Context、Window 或 Res
 
 ## 服务端 DEX 安装协议
 
-服务端返回三个对象：`payload.dex.jar`、七行 UTF-8 descriptor、RSA signature。descriptor 是：
+服务端返回三个对象：`payload.dex.jar`、固定七行 UTF-8 descriptor、RSA signature。descriptor 是：
 
 ```text
 x2c-plugin-v2
@@ -170,8 +172,9 @@ x2c-plugin-v2
 ```
 
 签名算法当前为 `SHA256withRSA`，签名输入是 descriptor 的原始 canonical bytes。宿主固定 publisher public
-key，先验签 metadata，并在落盘前校验 host/plugin component runtime ABI；dependency closure digest 用于
-服务端目录和构建报告审计，最终 payload digest 同时绑定 module、依赖、transform 和 registry。通过后再把
+key，先验签 metadata，并在落盘前校验 host/plugin component runtime ABI。descriptor 不维护宿主业务 API
+白名单；宿主依赖按正常 ClassLoader 链在首次使用时解析。dependency closure digest 用于服务端目录和构建
+报告审计，最终 payload digest 同时绑定 module、依赖、transform 和 registry。通过后再把
 payload 流式写入 app 私有目录并校验 SHA-256。动态代码临时文件会在写入任何
 内容前设为只读，以满足 Android 14 动态代码加载要求；安装器持久化每个 pluginId 的最高 versionCode，
 拒绝降级及“相同 versionCode、不同摘要”。生产还应补充证书轮换、吊销、灰度、崩溃回滚索引、磁盘配额、

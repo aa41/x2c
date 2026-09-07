@@ -55,7 +55,7 @@ public final class ResourceCompilationEngine {
         List<ResourceFile> files = discover(uniqueRoots);
         for (ResourceFile file : files) {
             if (file.kind.equals("values")) {
-                parseValues(file, model);
+                parseValues(file, model, pluginMode);
             }
         }
         validateValueReferences(model);

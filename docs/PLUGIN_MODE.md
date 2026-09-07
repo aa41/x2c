@@ -6,10 +6,10 @@
 
 ```text
 需要服务端后发、DexClassLoader、无 res/resource table
-  -> pluginMode=true -> x2c<Variant>DexJar
+  -> pluginMode=true -> x2cBuild<Variant> -> x2c<Variant>DexJar
 
 需要标准依赖、Manifest merge、原生 Resources/本地图片
-  -> pluginMode=false -> assemble<Variant>/AAR
+  -> pluginMode=false -> x2cBuild<Variant> -> assemble<Variant>/AAR
 ```
 
 同一业务如果必须发行两种形态，优先使用两个 publishing module，共享源码而不共享 Manifest/依赖配置。
@@ -21,10 +21,14 @@
 
 ```bash
 # 动态、无资源的 DEX JAR
-./gradlew :library:x2cReleaseDexJar -Px2c.pluginMode=true
+./gradlew :library:x2cBuildRelease -Px2c.pluginMode=true
 
 # 普通 AAR
-./gradlew :library:assembleRelease -Px2c.pluginMode=false
+./gradlew :library:x2cBuildRelease -Px2c.pluginMode=false
+
+# 等价 CLI；脚本会校验最终 JAR/AAR 和 report，而不只判断 Gradle exit code
+./scripts/build-x2c-artifact.sh --module :library --mode plugin --variant release
+./scripts/build-x2c-artifact.sh --module :library --mode normal --variant release
 ```
 
 如果 `build.gradle(.kts)` 中显式调用了 `pluginMode.set(...)`，显式配置优先于命令行 convention。需要快速切换的 module 应删除硬编码，或统一写成：
@@ -58,6 +62,8 @@ x2c {
 - 应用 `dev.x2c.codegen`；需要动态 Android 组件时同时应用 `dev.x2c.activity-plugin`。
 - 业务 module 使用 `compileOnly` 编译 `x2c-runtime`、`x2c-plugin-api`、`x2c-plugin-runtime`、
   `x2c-plugin-base`；最终宿主唯一持有这些公共 class。
+- compileOnly 业务 Base 只以 `@X2cPluginBase` 提取最小转换单元；analytics/账户/网络等未进入 payload 的
+  业务类由 PluginClassLoader 自动回退宿主，无需声明专用注解。必须随插件隔离的实现才放入 `include`。
 - `AndroidManifest.xml` 不声明插件 Activity、Service、Receiver 或 Provider。系统只认识 runtime AAR 预声明的非导出代理容器。
 - 每个同时加载的 JAR 必须使用唯一 `x2c.pluginId` 和唯一 `x2c.generatedPackage`。
 - 位图必须经过不可变 asset lock/CDN 流程；最终 `codegen.jar` 只能包含 class，DEX JAR 只能包含 `classes.dex`。
@@ -88,12 +94,13 @@ unzip -l library/build/outputs/x2c/release/codegen-dex.jar
 - Activity、Service、Receiver、Provider 由 Android framework 按 Manifest 原生创建，不执行插件组件 superclass transform。
 - `R2` 是无状态查询 facade，通过模块 Provider/宿主 `Resources` 解析最终资源 ID；没有 `R2.init()`。
 - 不需要 asset lock，也不应运行 `x2c<Variant>Jar`/`x2c<Variant>DexJar`；两者都会明确失败，因为 normal class 不能脱离宿主 resource table。若误运行组件转换 task，也会报错 `Android component transformation requires x2c.pluginMode=true`。
-- 若仍应用 `dev.x2c.activity-plugin`，配置阶段会失败。正常 AAR 必须移除该组件 transform 插件，让 framework 根据合并后的 Manifest 创建组件。
+- 双模式 module 可以保留 `dev.x2c.activity-plugin`，normal 路径不会依赖或执行转换 task；此时 framework
+  仍根据合并后的 Manifest 创建组件。直接误执行转换/JAR/DEX JAR task 会在执行期明确失败。
 
 推荐验证：
 
 ```bash
-./gradlew :library:assembleRelease -Px2c.pluginMode=false
+./gradlew :library:x2cBuildRelease -Px2c.pluginMode=false
 unzip -l library/build/outputs/aar/library-release.aar
 ```
 
@@ -113,6 +120,14 @@ unzip -l library/build/outputs/aar/library-release.aar
 | 加载 | 验签、独立 ClassLoader、`PluginComponentManager` | application ClassLoader |
 
 建议为两种模式使用独立 publishing module；共享业务源码可以放到普通 Java/source module。这样可避免条件 Manifest、条件依赖和错误发布物混用。仓库中的 `fixtures/producer` 与 `fixtures/normal-library` 就是两条独立、可同时验证的基线。
+
+如果确实使用单 module，必须像 `fixtures/producer` 一样让同一个 Provider 同时控制 `x2c.pluginMode`、
+`compileOnly`/`api` 依赖和 plugin/normal Manifest。只让生成器读取 boolean、却把依赖或 Manifest 写死，虽然
+可能编译成功，但产物语义并不安全。
+
+自定义 View 的 `IMAGE_ASSET` setter 在 plugin 模式接收 `ImageAsset`，normal 模式接收宿主
+`Drawable`。同一 View 若要双模式复用，应为相同 setter 名提供这两个 overload；这样 bitmap 在插件模式走
+CDN metadata，在普通模式仍来自 AAR resource table。
 
 ## 切换后的安全回归
 

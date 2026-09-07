@@ -35,6 +35,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
     public void apply(final Project project) {
         final X2cExtension extension = project.getExtensions().create("x2c", X2cExtension.class);
         extension.getPluginMode().convention(pluginModeConvention(project));
+        extension.getPluginId().convention("");
         extension.getMinApi().convention(21);
 
         project.getPluginManager().withPlugin(ANDROID_LIBRARY_PLUGIN, new Action<org.gradle.api.plugins.AppliedPlugin>() {
@@ -153,7 +154,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
 
         includeOptionalJvmCompilerOutputs(project, variant, jar);
 
-        project.getTasks().register(
+        final TaskProvider<DexJarTask> dex = project.getTasks().register(
                 "x2c" + capitalized + "DexJar",
                 DexJarTask.class,
                 new Action<DexJarTask>() {
@@ -174,6 +175,35 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                                 project.getBuildDir(), "outputs/x2c/" + variant.getName() + "/codegen-dex.jar"));
                     }
                 });
+
+        final TaskProvider<Task> buildArtifact = project.getTasks().register(
+                "x2cBuild" + capitalized,
+                new Action<Task>() {
+                    @Override
+                    public void execute(Task task) {
+                        task.setGroup("x2c");
+                        task.setDescription("Builds the configured X2C artifact for "
+                                + variant.getName() + " (DEX JAR in plugin mode, AAR in normal mode)");
+                    }
+                });
+        // Select the publication path during configuration, after the module has had a chance to
+        // finalize x2c.pluginMode. No Project access is performed by a task action, so this remains
+        // compatible with Gradle configuration cache and the full AGP 3.5-8.x matrix.
+        project.afterEvaluate(new Action<Project>() {
+            @Override
+            public void execute(Project ignored) {
+                buildArtifact.configure(new Action<Task>() {
+                    @Override
+                    public void execute(Task task) {
+                        if (extension.getPluginMode().get()) {
+                            task.dependsOn(dex);
+                        } else {
+                            task.dependsOn(variant.getAssembleProvider());
+                        }
+                    }
+                });
+            }
+        });
     }
 
     private static void includeOptionalJvmCompilerOutputs(

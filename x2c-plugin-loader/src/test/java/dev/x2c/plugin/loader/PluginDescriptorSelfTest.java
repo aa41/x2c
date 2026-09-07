@@ -17,7 +17,7 @@ public final class PluginDescriptorSelfTest {
         PluginDescriptor descriptor = new PluginDescriptor(
                 "dev.x2c.sample", 7L, "7.0.0", 1, DEPENDENCY_DIGEST, DIGEST);
         String expected = "x2c-plugin-v2\ndev.x2c.sample\n7\n7.0.0\n1\n"
-                + DEPENDENCY_DIGEST + "\n" + DIGEST + "\n";
+                + DEPENDENCY_DIGEST + '\n' + DIGEST + '\n';
         require(Arrays.equals(expected.getBytes("UTF-8"), descriptor.signedBytes()),
                 "Canonical signed metadata changed");
         PluginDescriptor parsed = PluginDescriptor.parse(
@@ -50,7 +50,6 @@ public final class PluginDescriptorSelfTest {
         }
         System.out.println("PluginDescriptorSelfTest: passed");
     }
-
     private static void require(boolean value, String message) {
         if (!value) throw new AssertionError(message);
     }

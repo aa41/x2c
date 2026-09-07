@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AAPT2 declarations for the custom setter contract used by the dual-mode fixture. -->
+    <attr name="hintText" format="string" />
+    <attr name="inputMode" format="integer" />
+    <attr name="layout_columnSpan" format="integer" />
+    <attr name="layout_breakBefore" format="boolean" />
+    <attr name="layout_itemGravity">
+        <flag name="center" value="0x11" />
+    </attr>
+    <attr name="label" format="string" />
+    <attr name="accentColor" format="color" />
+    <attr name="spacing" format="dimension" />
+    <attr name="emphasized" format="boolean" />
+    <attr name="maxItems" format="integer" />
+    <attr name="opacityFactor" format="float" />
+    <attr name="panelDrawable" format="reference" />
+    <attr name="heroAsset" format="reference" />
+</resources>

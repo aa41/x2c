@@ -27,14 +27,10 @@ public final class X2cActivityPlugin implements Plugin<Project> {
                         "dev.x2c.activity-plugin requires com.android.library and dev.x2c.codegen");
             }
             X2cExtension x2c = project.getExtensions().getByType(X2cExtension.class);
-            if (!x2c.getPluginId().isPresent()
-                    || x2c.getPluginId().get().trim().isEmpty()) {
+            if (x2c.getPluginMode().get()
+                    && (!x2c.getPluginId().isPresent()
+                    || x2c.getPluginId().get().trim().isEmpty())) {
                 throw new GradleException("Configure x2c.pluginId");
-            }
-            if (!x2c.getPluginMode().get()) {
-                throw new GradleException(
-                        "dev.x2c.activity-plugin requires x2c.pluginMode=true. "
-                                + "Remove the component transform plugin when publishing a normal AAR.");
             }
         });
     }
@@ -54,6 +50,9 @@ public final class X2cActivityPlugin implements Plugin<Project> {
                             task.setDescription(
                                     "Rewrites plugin components and generates their direct registry");
                             task.dependsOn(x2cJarTaskName);
+                            // Keep the task input complete in normal mode so an accidental direct
+                            // invocation reaches the explicit pluginMode guard instead of failing
+                            // Gradle property validation with an unrelated missing-value message.
                             task.getPluginId().set(x2c.getPluginId());
                             task.getPluginMode().set(x2c.getPluginMode());
                             // Runtime configuration is the complete transitive dependency closure

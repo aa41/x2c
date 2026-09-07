@@ -24,7 +24,6 @@ import android.widget.TextView;
 import dev.x2c.fixture.businessbase.BusinessBaseActivity;
 import dev.x2c.fixture.producer.widget.LoginInputView;
 import dev.x2c.plugin.api.X2cPluginActivity;
-import dev.x2c.plugin.runtime.PluginActivity;
 import dev.x2c.runtime.ImageAsset;
 import dev.x2c.runtime.ImageLoadListener;
 import dev.x2c.runtime.X2C;
@@ -183,8 +182,9 @@ public final class DemoActivity extends BusinessBaseActivity {
         required(root, "image_failure", Button.class).setOnClickListener(
                 ignored -> loadImageTest("synthetic_failure"));
         required(root, "run_base_activity_probe", TextView.class).setOnClickListener(ignored -> {
+            recordBusinessAction("base_probe_click");
             updateBaseActivityStatus();
-            baseActivityStatus.append("\n点击探针=PASS · dependency class 已随 payload 转换");
+            baseActivityStatus.append("\n点击探针=PASS · lifecycle/analytics 闭包正常执行");
         });
         loginButton.setOnClickListener(ignored -> submitLogin());
         passwordInput.setOnEditorActionListener((view, actionId, event) -> {
@@ -198,21 +198,34 @@ public final class DemoActivity extends BusinessBaseActivity {
 
     private void updateBaseActivityStatus() {
         if (baseActivityStatus == null) return;
-        boolean pluginPrivate = BusinessBaseActivity.class.getClassLoader()
+        boolean sameLoader = BusinessBaseActivity.class.getClassLoader()
                 == DemoActivity.class.getClassLoader();
-        boolean transformedRoot = BusinessBaseActivity.class.getSuperclass()
-                .equals(PluginActivity.class);
-        boolean passed = pluginPrivate && transformedRoot && isBusinessBaseHealthy();
-        baseActivityStatus.setText("Shadow-style dependency closure="
+        String rootName = BusinessBaseActivity.class.getSuperclass().getName();
+        boolean pluginRoot = "dev.x2c.plugin.runtime.PluginActivity".equals(rootName);
+        boolean nativeRoot = "android.app.Activity".equals(rootName);
+        boolean passed = sameLoader && (pluginRoot || nativeRoot)
+                && isBusinessBaseHealthy() && isBusinessDependencyFallbackHealthy();
+        baseActivityStatus.setText((pluginRoot ? "Plugin-private" : "Normal AAR")
+                + " minimal base transform + host analytics="
                 + (passed ? "PASS" : "FAIL")
-                + " · BaseActivity → PluginActivity"
-                + "\nbase.loader="
-                + BusinessBaseActivity.class.getClassLoader().getClass().getName()
+                + " · BaseActivity → " + rootName
                 + "\n" + businessBaseSummary());
         baseActivityStatus.setTextColor(resources.color(passed ? "success" : "error"));
     }
 
     private void loadImageTest(String name) {
+        if (!isPluginRuntime()) {
+            if ("synthetic_failure".equals(name)) {
+                imageTestStatus.setText("normal AAR 使用本地 drawable；CDN 失败分支仅适用于插件模式");
+                imageTestStatus.setTextColor(resources.color("muted"));
+                return;
+            }
+            Drawable local = resources.drawable(this, name);
+            remoteImage.setImageDrawable(local);
+            imageTestStatus.setText("normal AAR local drawable=PASS · Resources/resource table");
+            imageTestStatus.setTextColor(resources.color("success"));
+            return;
+        }
         ImageAsset metadata;
         if ("synthetic_failure".equals(name)) {
             ImageAsset hero = resources.image("hero");
@@ -258,6 +271,11 @@ public final class DemoActivity extends BusinessBaseActivity {
         });
         remoteImage.setContentDescription("X2C image " + metadata.name
                 + " from " + metadata.url);
+    }
+
+    private static boolean isPluginRuntime() {
+        return "dev.x2c.plugin.runtime.PluginActivity".equals(
+                BusinessBaseActivity.class.getSuperclass().getName());
     }
 
     private void bindFrameworkMatrix(View root) {

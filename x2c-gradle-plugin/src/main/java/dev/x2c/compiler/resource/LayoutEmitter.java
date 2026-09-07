@@ -605,7 +605,15 @@ final class LayoutEmitter {
             return "X2cDrawables." + javaName(referenceName(attribute.value, "drawable")) + "(context)";
         }
         if ("IMAGE_ASSET".equals(type)) {
-            return "X2cImages.get(" + javaString(referenceName(attribute.value, "drawable")) + ")";
+            String name = referenceName(attribute.value, "drawable");
+            if (pluginMode) {
+                return "X2cImages.get(" + javaString(name) + ")";
+            }
+            // A dual-mode custom View may overload the same setter with ImageAsset for plugins
+            // and Drawable for a normal AAR. Normal mode must never synthesize CDN metadata for a
+            // bitmap that remains owned by the host resource table.
+            return "context.getResources().getDrawable(X2cModule.identifier(\"drawable\", "
+                    + javaString(name) + "), context.getTheme())";
         }
         throw new AssertionError(type);
     }

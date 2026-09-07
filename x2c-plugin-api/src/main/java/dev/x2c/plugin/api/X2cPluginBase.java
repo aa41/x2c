@@ -9,8 +9,10 @@ import java.lang.annotation.Target;
  * Opts a compile-only business Activity base into the plugin-private transform closure.
  *
  * <p>The host keeps its normal {@code Activity}-rooted class. The plugin build copies the marked
- * class and its reachable same-artifact class dependencies, then rewrites only that private copy.
- * Types reached only through reflection can be listed explicitly with {@link #include()}.</p>
+ * class, its Activity ancestor chain, and structural nest/inner classes, then rewrites only that
+ * private transform unit. Additional plugin-private implementations must be listed explicitly
+ * with {@link #include()}; all other references resolve from the host ClassLoader when absent from
+ * the plugin payload.</p>
  */
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)

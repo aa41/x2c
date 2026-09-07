@@ -41,8 +41,11 @@ ClassLoader 前被明确拒绝，不能通过清空或放宽生产安装器来�
 
 业务 Activity 继承独立 `business-base` Android library 中的普通 `BusinessBaseActivity extends Activity`。
 该根使用 `@X2cPluginBase`；宿主使用 `implementation`，两个插件使用 `compileOnly project`。插件构建只把
-实际继承的标注 class 闭包复制进 payload，并转换为 `BusinessBaseActivity -> PluginActivity`。页面会显示 constructor、
-attach/create/start/resume 顺序以及 plugin-private ClassLoader，验证真实业务基类代码被完整执行。
+实际继承的标注 class 闭包复制进 payload，并转换为 `BusinessBaseActivity -> PluginActivity`。base 还引用了独立
+`analytics` package 中的生命周期埋点、事件 model 和 formatter；这些普通引用不会进入 payload，而由插件
+ClassLoader 自动回退到宿主副本。页面会显示
+constructor、attach/create/start/resume/pause/stop 顺序、埋点 trace、plugin-private BaseActivity loader 与
+宿主 analytics loader，验证真实业务基类和宿主业务依赖可以协同执行。
 
 ## Demo 2：Activity / 四大组件 showcase
 
@@ -67,6 +70,8 @@ Manifest Activity 和本地图片，由 generated provider 使用宿主 Resource
 ## 验证
 
 ```bash
+./scripts/build-x2c-artifact.sh --module :fixtures:producer --mode plugin
+./scripts/build-x2c-artifact.sh --module :fixtures:producer --mode normal
 ./scripts/verify.sh
 ./scripts/verify-plugin-modes.sh
 ./scripts/verify-plugin-showcases.sh    # 需要 adb 设备

@@ -132,6 +132,11 @@ run_fixture() {
 }
 
 run_fixture "$task_gradle54" "$task_java8" 3.5.4
+JAVA_HOME="$task_java8" ANDROID_HOME="$task_sdk" "$task_gradle54" \
+    -p "$task_root/compatibility/fixture" clean x2cBuildRelease \
+    -PagpVersion=3.5.4 -Px2cPluginMode=false \
+    ${task_offline_args[@]+"${task_offline_args[@]}"} \
+    --no-daemon --no-build-cache --console=plain
 run_fixture "$task_gradle65" "$task_java8" 4.1.3
 run_fixture "$task_gradle75" "$task_java11" 7.3.1
 run_fixture "$task_gradle75" "$task_java11" 7.4.2

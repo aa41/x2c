@@ -3,6 +3,7 @@ package dev.x2c.fixture.consumer;
 import android.content.Context;
 import android.util.Base64;
 import dev.x2c.fixture.businessbase.BusinessBaseActivity;
+import dev.x2c.fixture.businessbase.analytics.BusinessLifecycleAnalytics;
 import dev.x2c.plugin.api.PluginComponentRegistry;
 import dev.x2c.plugin.base.BasePluginActivity;
 import dev.x2c.plugin.loader.PluginDescriptor;
@@ -237,6 +238,9 @@ public final class DynamicLibraryLoader {
         Class<?> hostBase = BusinessBaseActivity.class;
         Class<?> layoutBase = layoutLoader.loadClass(hostBase.getName());
         Class<?> componentBase = componentLoader.loadClass(hostBase.getName());
+        Class<?> hostAnalytics = BusinessLifecycleAnalytics.class;
+        Class<?> layoutAnalytics = layoutLoader.loadClass(hostAnalytics.getName());
+        Class<?> componentAnalytics = componentLoader.loadClass(hostAnalytics.getName());
         if (hostBase.getSuperclass() != android.app.Activity.class
                 || layoutBase == hostBase
                 || componentBase == hostBase
@@ -244,9 +248,11 @@ public final class DynamicLibraryLoader {
                 || layoutBase.getClassLoader() != layoutLoader
                 || componentBase.getClassLoader() != componentLoader
                 || layoutBase.getSuperclass() != PluginActivity.class
-                || componentBase.getSuperclass() != PluginActivity.class) {
+                || componentBase.getSuperclass() != PluginActivity.class
+                || layoutAnalytics != hostAnalytics
+                || componentAnalytics != hostAnalytics) {
             throw new IllegalStateException(
-                    "Shared-source BusinessBaseActivity ownership/transform boundary is invalid");
+                    "BusinessBase transform or host ClassLoader fallback boundary is invalid");
         }
     }
 

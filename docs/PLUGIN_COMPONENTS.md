@@ -59,14 +59,19 @@ PluginPage -> payload 内 BusinessBaseActivity -> PluginActivity
 Shadow 同样没有让插件复用宿主中那个未改写的 BaseActivity class。它会对完整插件 transform 输入做类型替换；
 插件 ClassLoader 得到的是 `Activity -> ShadowActivity` 后的独立副本。X2C 使用
 `@X2cPluginBase + compileOnly(project(...))` 达到相同结果：从 compile classpath 复制实际被继承的 base、
-父类链与同 artifact class 依赖，并统一改写为 `BusinessBaseActivity -> PluginActivity`。宿主仍
+Activity 父类链与结构性 nest/内部类，并统一改写为 `BusinessBaseActivity -> PluginActivity`。宿主仍
 `implementation` 原 class。两端复用源码和 API，但不共享 class identity、static state 或 Activity 实例。
 未标注的普通 base 不能通过 ClassLoader fallback 充当插件父类。
 
-第一阶段 ownership 是封闭的：平台与 X2C runtime/API/base/loader 为 parent-first 且禁止打包；business
-被选择的 business dependency 为 plugin-private；其 `R`/TypedArray/resource-backed API、JNI、重复 class 和
-AndroidX/AppCompat/Material 均构建期失败。依赖 class digest 写入 transform 报告，签名 payload digest 覆盖
-合并转换后的全部 class。
+这里不会再把 BaseActivity 的所有字段类型、生命周期埋点、controller 或 SDK 自动复制进插件。必须同
+ClassLoader 的插件私有实现通过 `@X2cPluginBase(include = {...})` 明确声明；analytics、账户、网络、路由等
+未进入 payload 的能力由 PluginClassLoader 在插件查找失败后直接委托宿主。无需业务注解或白名单；宿主需
+保证相关 class/member 存在，并为后发插件调用配置 shrink keep 与版本兼容策略。
+
+第一阶段 ownership 规则是：平台与 X2C runtime/API/base/loader 为 parent-first 且禁止打包；business
+base transform unit 和显式 include 为 plugin-private；其余未打包业务引用采用 host fallback。相关
+`R`/TypedArray/resource-backed API、JNI、重复 class 和 AndroidX/AppCompat/Material 均
+构建期失败。依赖 class digest 写入 transform 报告，签名 payload digest 覆盖合并转换后的全部 class。
 
 公共 base 本身由宿主预编译，转换器不会改写其中的字节码。因此公共 base 的实现不得直接调用需要 ASM bridge
 的 framework final API（例如 `Activity.getApplication()` / `setResult()`）；请调用公开的 plugin bridge，或把
