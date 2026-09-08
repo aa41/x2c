@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 960">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap');
+    text { font-family: 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', sans-serif; }
+    .title { fill: #f8fafc; font-size: 22px; font-weight: 700; }
+    .subtitle { fill: #94a3b8; font-size: 10px; }
+    .region-title { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+    .name { fill: #f8fafc; font-size: 11px; font-weight: 600; text-anchor: middle; }
+    .desc { fill: #94a3b8; font-size: 8px; text-anchor: middle; }
+    .tiny { fill: #cbd5e1; font-size: 8px; text-anchor: middle; }
+    .arrow-label { fill: #cbd5e1; font-size: 8px; text-anchor: middle; }
+    .mask { fill: #0f172a; }
+    .primary { fill: #083344; fill-opacity: .62; stroke: #22d3ee; stroke-width: 1.5; }
+    .secondary { fill: #064e3b; fill-opacity: .58; stroke: #34d399; stroke-width: 1.5; }
+    .tertiary { fill: #4c1d95; fill-opacity: .50; stroke: #a78bfa; stroke-width: 1.5; }
+    .accent { fill: #78350f; fill-opacity: .48; stroke: #fbbf24; stroke-width: 1.5; }
+    .connector { fill: #7c2d12; fill-opacity: .46; stroke: #fb923c; stroke-width: 1.5; }
+    .neutral { fill: #1e293b; fill-opacity: .78; stroke: #94a3b8; stroke-width: 1.3; }
+    .alert { fill: #881337; fill-opacity: .48; stroke: #fb7185; stroke-width: 1.5; }
+  </style>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#34d399"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#fbbf24"/>
+    </marker>
+    <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#a78bfa"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#fb923c"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="960" fill="#0f172a"/>
+  <rect width="1600" height="960" fill="url(#grid)"/>
+
+  <text x="30" y="35" class="title">X2C RESOURCE-FREE ANDROID PLUGIN · 总体架构</text>
+  <text x="30" y="58" class="subtitle">XML/resources → Java/DEX · 标准 ClassLoader 隔离 · 宿主容器代理 · plugin / normal 双发行</text>
+
+  <!-- Region boundaries -->
+  <rect x="30" y="88" width="250" height="690" rx="14" fill="none" stroke="#22d3ee" stroke-width="1.2" stroke-dasharray="8,4"/>
+  <text x="45" y="108" fill="#22d3ee" class="region-title">① ANDROID LIBRARY INPUT</text>
+  <rect x="310" y="88" width="470" height="690" rx="14" fill="none" stroke="#34d399" stroke-width="1.2" stroke-dasharray="8,4"/>
+  <text x="325" y="108" fill="#34d399" class="region-title">② BUILD-TIME COMPILATION</text>
+  <rect x="810" y="88" width="230" height="690" rx="14" fill="none" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="8,4"/>
+  <text x="825" y="108" fill="#fbbf24" class="region-title">③ ARTIFACTS</text>
+  <rect x="1070" y="88" width="500" height="690" rx="14" fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="8,4"/>
+  <text x="1085" y="108" fill="#a78bfa" class="region-title">④ HOST PROCESS / ANDROID RUNTIME</text>
+  <rect x="30" y="808" width="1540" height="115" rx="14" fill="#1e293b" fill-opacity=".28" stroke="#fb923c" stroke-width="1.1" stroke-dasharray="8,4"/>
+  <text x="45" y="829" fill="#fb923c" class="region-title">DELIVERY &amp; GOVERNANCE</text>
+
+  <!-- Connections: source and build -->
+  <path d="M255 178H340" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <path d="M255 298H325V308H340" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <path d="M255 418H290V308H340" fill="none" stroke="#64748b" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <path d="M255 538H545V178H560" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <path d="M255 658H545V438H560" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <path d="M530 178H560" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M655 218V270H435" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M530 308H560" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M655 346V398H435" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M530 438H560" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M435 476V530" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M655 476V530" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M530 568H560" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M435 606V658H450" fill="none" stroke="#64748b" stroke-width="1.1" marker-end="url(#arrow)"/>
+  <path d="M655 606V658H640" fill="none" stroke="#64748b" stroke-width="1.1" marker-end="url(#arrow)"/>
+
+  <!-- Connections: build to artifacts -->
+  <path d="M530 568H795V178H830" fill="none" stroke="#fbbf24" stroke-width="1.4" marker-end="url(#arrow-amber)"/>
+  <path d="M750 438H795V308H830" fill="none" stroke="#fbbf24" stroke-width="1.4" marker-end="url(#arrow-amber)"/>
+  <path d="M750 568H795V438H830" fill="none" stroke="#fbbf24" stroke-width="1.6" marker-end="url(#arrow-amber)"/>
+  <path d="M530 568H795V568H830" fill="none" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="6,3" marker-end="url(#arrow-amber)"/>
+  <path d="M640 696H830" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+  <!-- Connections: artifacts and host runtime -->
+  <path d="M1015 438H1055V178H1330" fill="none" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+  <path d="M1015 568H1085V178H1100" fill="none" stroke="#22d3ee" stroke-width="1.4" marker-end="url(#arrow-cyan)"/>
+  <path d="M1200 216V270" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <path d="M1430 216V270" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <path d="M1300 308H1330" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <path d="M1200 346V410" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <path d="M1430 346V410" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <path d="M1300 448H1330" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <path d="M1200 486V550" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <path d="M1430 550H1300" fill="none" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <path d="M1200 626V680H1215" fill="none" stroke="#a78bfa" stroke-width="1.3" marker-end="url(#arrow-violet)"/>
+  <path d="M1430 626V680H1415" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+  <!-- Delivery connections -->
+  <path d="M925 778V845H735" fill="none" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <path d="M825 876H1320V216" fill="none" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="7,3" marker-end="url(#arrow-orange)"/>
+  <path d="M1010 876H1130V346H1330" fill="none" stroke="#fb923c" stroke-width="1.4" stroke-dasharray="7,3" marker-end="url(#arrow-orange)"/>
+
+  <!-- Opaque masks -->
+  <g class="mask">
+    <rect x="55" y="138" width="200" height="80" rx="7"/><rect x="55" y="258" width="200" height="80" rx="7"/>
+    <rect x="55" y="378" width="200" height="80" rx="7"/><rect x="55" y="498" width="200" height="80" rx="7"/>
+    <rect x="55" y="618" width="200" height="80" rx="7"/>
+    <rect x="340" y="138" width="190" height="80" rx="7"/><rect x="560" y="138" width="190" height="80" rx="7"/>
+    <rect x="340" y="268" width="190" height="78" rx="7"/><rect x="560" y="268" width="190" height="78" rx="7"/>
+    <rect x="340" y="398" width="190" height="78" rx="7"/><rect x="560" y="398" width="190" height="78" rx="7"/>
+    <rect x="340" y="528" width="190" height="78" rx="7"/><rect x="560" y="528" width="190" height="78" rx="7"/>
+    <rect x="450" y="656" width="190" height="76" rx="7"/>
+    <rect x="830" y="138" width="185" height="80" rx="7"/><rect x="830" y="268" width="185" height="80" rx="7"/>
+    <rect x="830" y="398" width="185" height="80" rx="7"/><rect x="830" y="528" width="185" height="80" rx="7"/>
+    <rect x="830" y="658" width="185" height="76" rx="7"/>
+    <rect x="1100" y="138" width="200" height="78" rx="7"/><rect x="1330" y="138" width="200" height="78" rx="7"/>
+    <rect x="1100" y="268" width="200" height="78" rx="7"/><rect x="1330" y="268" width="200" height="78" rx="7"/>
+    <rect x="1100" y="408" width="200" height="78" rx="7"/><rect x="1330" y="408" width="200" height="78" rx="7"/>
+    <rect x="1100" y="548" width="200" height="78" rx="7"/><rect x="1330" y="548" width="200" height="78" rx="7"/>
+    <rect x="1215" y="678" width="200" height="72" rx="7"/>
+    <rect x="585" y="842" width="240" height="68" rx="7"/><rect x="870" y="842" width="140" height="68" rx="7"/>
+  </g>
+
+  <!-- Source boxes -->
+  <g><rect x="55" y="138" width="200" height="80" rx="7" class="primary"/><text x="155" y="168" class="name">Android Library</text><text x="155" y="187" class="desc">Java / Kotlin / Scala</text><text x="155" y="202" class="desc">一个业务源码，多种发行形态</text></g>
+  <g><rect x="55" y="258" width="200" height="80" rx="7" class="primary"/><text x="155" y="287" class="name">XML / resources</text><text x="155" y="306" class="desc">layout · values · color · drawable</text><text x="155" y="321" class="desc">bitmap 为编译输入，不进入插件</text></g>
+  <g><rect x="55" y="378" width="200" height="80" rx="7" class="primary"/><text x="155" y="407" class="name">业务组件 bytecode</text><text x="155" y="426" class="desc">Activity · Service · Receiver</text><text x="155" y="441" class="desc">Provider · 自定义继承链</text></g>
+  <g><rect x="55" y="498" width="200" height="80" rx="7" class="primary"/><text x="155" y="527" class="name">x2c DSL / contracts</text><text x="155" y="546" class="desc">pluginMode · pluginId · minApi</text><text x="155" y="561" class="desc">asset lock · custom views</text></g>
+  <g><rect x="55" y="618" width="200" height="80" rx="7" class="primary"/><text x="155" y="647" class="name">compileOnly business base</text><text x="155" y="666" class="desc">@X2cPluginBase 最小转换单元</text><text x="155" y="681" class="desc">普通依赖保留为 host fallback</text></g>
+
+  <!-- Build boxes -->
+  <g><rect x="340" y="138" width="190" height="80" rx="7" class="secondary"/><text x="435" y="167" class="name">Resource Scanner / Parser</text><text x="435" y="186" class="desc">安全 XML · qualifiers · duplicate</text><text x="435" y="201" class="desc">values/color/drawable/layout</text></g>
+  <g><rect x="560" y="138" width="190" height="80" rx="7" class="secondary"/><text x="655" y="167" class="name">Typed Model / Registry</text><text x="655" y="186" class="desc">R2 symbols · View/LayoutParams</text><text x="655" y="201" class="desc">drawable graph · stable IDs</text></g>
+  <g><rect x="340" y="268" width="190" height="78" rx="7" class="secondary"/><text x="435" y="297" class="name">Java Source Generator</text><text x="435" y="316" class="desc">R2 · Layouts · Values · Drawables</text><text x="435" y="331" class="desc">Images · Provider · Bootstrap</text></g>
+  <g><rect x="560" y="268" width="190" height="78" rx="7" class="secondary"/><text x="655" y="297" class="name">Variant JavaCompile</text><text x="655" y="316" class="desc">generated source 参与 IDE / Javac</text><text x="655" y="331" class="desc">AGP 3.5.x – 8.x 公共接线</text></g>
+  <g><rect x="340" y="398" width="190" height="78" rx="7" class="secondary"/><text x="435" y="427" class="name">Contract Verifiers</text><text x="435" y="446" class="desc">R/TypedArray/resources/Manifest</text><text x="435" y="461" class="desc">未知能力 fail closed</text></g>
+  <g><rect x="560" y="398" width="190" height="78" rx="7" class="secondary"/><text x="655" y="427" class="name">ASM Component Transform</text><text x="655" y="446" class="desc">superclass / callsite / registry</text><text x="655" y="461" class="desc">compileOnly base closure</text></g>
+  <g><rect x="340" y="528" width="190" height="78" rx="7" class="secondary"/><text x="435" y="557" class="name">Deterministic JAR</text><text x="435" y="576" class="desc">排序 entry · 固定时间戳</text><text x="435" y="591" class="desc">只保留业务与 generated class</text></g>
+  <g><rect x="560" y="528" width="190" height="78" rx="7" class="secondary"/><text x="655" y="557" class="name">Android D8</text><text x="655" y="576" class="desc">activity-plugin.jar → classes.dex</text><text x="655" y="591" class="desc">minApi 明确输入</text></g>
+  <g><rect x="450" y="656" width="190" height="76" rx="7" class="neutral"/><text x="545" y="685" class="name">Reports / Hashes</text><text x="545" y="704" class="desc">resources · assets · components</text><text x="545" y="719" class="desc">dependency closure SHA-256</text></g>
+
+  <!-- Artifact boxes -->
+  <g><rect x="830" y="138" width="185" height="80" rx="7" class="accent"/><text x="922" y="168" class="name">codegen.jar</text><text x="922" y="187" class="desc">JVM class-only</text><text x="922" y="202" class="desc">静态审计 / D8 输入</text></g>
+  <g><rect x="830" y="268" width="185" height="80" rx="7" class="accent"/><text x="922" y="298" class="name">activity-plugin.jar</text><text x="922" y="317" class="desc">组件继承链已转换</text><text x="922" y="332" class="desc">generated direct registry</text></g>
+  <g><rect x="830" y="398" width="185" height="80" rx="7" class="accent"/><text x="922" y="428" class="name">codegen-dex.jar</text><text x="922" y="447" class="desc">仅 classes.dex</text><text x="922" y="462" class="desc">服务端后发插件产物</text></g>
+  <g><rect x="830" y="528" width="185" height="80" rx="7" class="accent"/><text x="922" y="558" class="name">normal AAR</text><text x="922" y="577" class="desc">classes + res + Manifest</text><text x="922" y="592" class="desc">标准 Android library</text></g>
+  <g><rect x="830" y="658" width="185" height="76" rx="7" class="neutral"/><text x="922" y="687" class="name">Build metadata</text><text x="922" y="706" class="desc">report.json · activities.json</text><text x="922" y="721" class="desc">asset candidates / descriptor input</text></g>
+
+  <!-- Host boxes -->
+  <g><rect x="1100" y="138" width="200" height="78" rx="7" class="tertiary"/><text x="1200" y="167" class="name">Host Application</text><text x="1200" y="186" class="desc">attachBaseContext: X2C.init once</text><text x="1200" y="201" class="desc">唯一 runtime / host ClassLoader</text></g>
+  <g><rect x="1330" y="138" width="200" height="78" rx="7" class="alert"/><text x="1430" y="167" class="name">SignedPluginInstaller</text><text x="1430" y="186" class="desc">RSA · SHA-256 · ABI · downgrade</text><text x="1430" y="201" class="desc">私有只读文件 · 原子安装</text></g>
+  <g><rect x="1100" y="268" width="200" height="78" rx="7" class="tertiary"/><text x="1200" y="297" class="name">PluginClassLoader</text><text x="1200" y="316" class="desc">业务 plugin-first</text><text x="1200" y="331" class="desc">缺失 → host fallback</text></g>
+  <g><rect x="1330" y="268" width="200" height="78" rx="7" class="tertiary"/><text x="1430" y="297" class="name">X2C Module Registry</text><text x="1430" y="316" class="desc">anchor → bootstrap → provider</text><text x="1430" y="331" class="desc">layouts / values / drawables / images</text></g>
+  <g><rect x="1100" y="408" width="200" height="78" rx="7" class="tertiary"/><text x="1200" y="437" class="name">Component Managers</text><text x="1200" y="456" class="desc">Activity · Service · Receiver</text><text x="1200" y="471" class="desc">Provider · slot / route / state</text></g>
+  <g><rect x="1330" y="408" width="200" height="78" rx="7" class="tertiary"/><text x="1430" y="437" class="name">Manifest Containers</text><text x="1430" y="456" class="desc">4 launchMode × 8 Activity</text><text x="1430" y="471" class="desc">8 Service · Receiver · Provider</text></g>
+  <g><rect x="1100" y="548" width="200" height="78" rx="7" class="tertiary"/><text x="1200" y="577" class="name">Plugin Delegates</text><text x="1200" y="596" class="desc">direct new · lifecycle bridge</text><text x="1200" y="611" class="desc">PluginContext / X2cResources</text></g>
+  <g><rect x="1330" y="548" width="200" height="78" rx="7" class="connector"/><text x="1430" y="577" class="name">Host Facade / Services</text><text x="1430" y="596" class="desc">analytics · account · network</text><text x="1430" y="611" class="desc">公共 ABI · 建议精确 keep</text></g>
+  <g><rect x="1215" y="678" width="200" height="72" rx="7" class="neutral"/><text x="1315" y="707" class="name">Android Framework</text><text x="1315" y="726" class="desc">系统只创建宿主已注册容器</text><text x="1315" y="741" class="desc">无 hidden API / Instrumentation Hook</text></g>
+
+  <!-- Delivery boxes and legend -->
+  <g><rect x="585" y="842" width="240" height="68" rx="7" class="connector"/><text x="705" y="870" class="name">Plugin Catalog / Server</text><text x="705" y="889" class="desc">版本范围 · 灰度 · 签名 metadata · 回滚策略</text></g>
+  <g><rect x="870" y="842" width="140" height="68" rx="7" class="connector"/><text x="940" y="870" class="name">HTTPS CDN</text><text x="940" y="889" class="desc">DEX payload / bitmap</text></g>
+  <g transform="translate(1080 847)">
+    <rect width="465" height="58" rx="7" fill="#0f172a" stroke="#334155"/>
+    <circle cx="22" cy="20" r="5" fill="#22d3ee"/><text x="36" y="23" fill="#cbd5e1" font-size="8">输入</text>
+    <circle cx="95" cy="20" r="5" fill="#34d399"/><text x="109" y="23" fill="#cbd5e1" font-size="8">构建期</text>
+    <circle cx="188" cy="20" r="5" fill="#fbbf24"/><text x="202" y="23" fill="#cbd5e1" font-size="8">产物</text>
+    <circle cx="267" cy="20" r="5" fill="#a78bfa"/><text x="281" y="23" fill="#cbd5e1" font-size="8">宿主运行时</text>
+    <circle cx="385" cy="20" r="5" fill="#fb923c"/><text x="399" y="23" fill="#cbd5e1" font-size="8">共享边界</text>
+    <text x="232" y="45" fill="#64748b" font-size="8" text-anchor="middle">实线 = 本地确定性流程 · 虚线 = 发布/网络边界</text>
+  </g>
+</svg>

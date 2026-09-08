@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1460 1240">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap');
+    text { font-family: 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', sans-serif; }
+    .title { fill: #f8fafc; font-size: 22px; font-weight: 700; }
+    .subtitle { fill: #94a3b8; font-size: 10px; }
+    .lane-title { font-size: 12px; font-weight: 700; text-anchor: middle; }
+    .name { fill: #f8fafc; font-size: 11px; font-weight: 600; text-anchor: middle; }
+    .desc { fill: #94a3b8; font-size: 8px; text-anchor: middle; }
+    .label { fill: #cbd5e1; font-size: 8px; text-anchor: middle; }
+    .mask { fill: #0f172a; }
+    .primary { fill: #083344; fill-opacity: .62; stroke: #22d3ee; stroke-width: 1.5; }
+    .secondary { fill: #064e3b; fill-opacity: .58; stroke: #34d399; stroke-width: 1.5; }
+    .accent { fill: #78350f; fill-opacity: .50; stroke: #fbbf24; stroke-width: 1.5; }
+    .highlight { fill: #1e3a8a; fill-opacity: .52; stroke: #60a5fa; stroke-width: 1.5; }
+    .alert { fill: #881337; fill-opacity: .52; stroke: #fb7185; stroke-width: 1.5; }
+    .neutral { fill: #1e293b; fill-opacity: .82; stroke: #94a3b8; stroke-width: 1.3; }
+  </style>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#64748b"/></marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#60a5fa"/></marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#34d399"/></marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#fb7185"/></marker>
+  </defs>
+
+  <rect width="1460" height="1240" fill="#0f172a"/><rect width="1460" height="1240" fill="url(#grid)"/>
+  <text x="30" y="35" class="title">X2C DUAL-MODE BUILD · 构建流程</text>
+  <text x="30" y="58" class="subtitle">统一入口 x2cBuild&lt;Variant&gt; · pluginMode 决定资源语义、组件转换与最终 artifact</text>
+
+  <!-- Swim lanes -->
+  <rect x="35" y="225" width="670" height="950" rx="15" fill="#083344" fill-opacity=".09" stroke="#22d3ee" stroke-width="1.2" stroke-dasharray="8,4"/>
+  <rect x="755" y="225" width="670" height="950" rx="15" fill="#064e3b" fill-opacity=".09" stroke="#34d399" stroke-width="1.2" stroke-dasharray="8,4"/>
+  <text x="370" y="253" fill="#22d3ee" class="lane-title">PLUGIN MODE · 无资源动态 DEX JAR</text>
+  <text x="1090" y="253" fill="#34d399" class="lane-title">NORMAL MODE · 标准 Android AAR</text>
+
+  <!-- Connections before nodes -->
+  <path d="M730 128V173" fill="none" stroke="#60a5fa" stroke-width="1.7" marker-end="url(#arrow-blue)"/>
+  <path d="M680 191H370V285" fill="none" stroke="#22d3ee" stroke-width="1.7" marker-end="url(#arrow-blue)"/>
+  <path d="M780 191H1090V285" fill="none" stroke="#34d399" stroke-width="1.7" marker-end="url(#arrow-green)"/>
+  <text x="530" y="181" fill="#22d3ee" font-size="9" text-anchor="middle">true</text>
+  <text x="930" y="181" fill="#34d399" font-size="9" text-anchor="middle">false</text>
+
+  <!-- Plugin lane arrows -->
+  <path d="M370 361V405" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <path d="M370 481V523" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <path d="M370 593V635" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <text x="384" y="619" fill="#34d399" font-size="8">是</text>
+  <path d="M320 558H123V635" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow-red)"/>
+  <text x="218" y="548" fill="#fb7185" font-size="8" text-anchor="middle">否 / 未锁定 bitmap</text>
+  <path d="M370 711V753" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <path d="M370 829V871" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <path d="M370 947V989" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <path d="M370 1065V1101" fill="none" stroke="#22d3ee" stroke-width="1.7" marker-end="url(#arrow-blue)"/>
+  <path d="M225 791H175V995" fill="none" stroke="#fb7185" stroke-width="1.2" stroke-dasharray="6,3" marker-end="url(#arrow-red)"/>
+  <path d="M225 1027H195" fill="none" stroke="#fb7185" stroke-width="1.2" stroke-dasharray="6,3" marker-end="url(#arrow-red)"/>
+
+  <!-- Normal lane arrows -->
+  <path d="M1090 361V405" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M1090 481V523" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M1090 599V641" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M1090 717V759" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M1090 835V877" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M1090 953V995" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <path d="M1090 1071V1101" fill="none" stroke="#34d399" stroke-width="1.7" marker-end="url(#arrow-green)"/>
+  <path d="M945 916H930V1028H915" fill="none" stroke="#fb7185" stroke-width="1.2" stroke-dasharray="6,3" marker-end="url(#arrow-red)"/>
+  <text x="854" y="905" fill="#fb7185" font-size="8">误调用 JAR / transform task</text>
+
+  <!-- Masks -->
+  <g class="mask">
+    <rect x="555" y="76" width="350" height="52" rx="26"/>
+    <polygon points="730,156 780,191 730,226 680,191"/>
+    <rect x="225" y="285" width="290" height="76" rx="7"/><rect x="225" y="405" width="290" height="76" rx="7"/>
+    <polygon points="370,523 420,558 370,593 320,558"/><rect x="50" y="635" width="145" height="76" rx="7"/>
+    <rect x="225" y="635" width="290" height="76" rx="7"/><rect x="225" y="753" width="290" height="76" rx="7"/>
+    <rect x="225" y="871" width="290" height="76" rx="7"/><rect x="225" y="989" width="290" height="76" rx="7"/>
+    <rect x="205" y="1101" width="330" height="58" rx="29"/>
+    <rect x="945" y="285" width="290" height="76" rx="7"/><rect x="945" y="405" width="290" height="76" rx="7"/>
+    <rect x="945" y="523" width="290" height="76" rx="7"/><rect x="945" y="641" width="290" height="76" rx="7"/>
+    <rect x="945" y="759" width="290" height="76" rx="7"/><rect x="945" y="877" width="290" height="76" rx="7"/>
+    <rect x="945" y="995" width="290" height="76" rx="7"/><rect x="925" y="1101" width="330" height="58" rx="29"/>
+    <rect x="50" y="995" width="145" height="70" rx="7"/><rect x="775" y="990" width="140" height="76" rx="7"/>
+  </g>
+
+  <!-- Shared start and decision -->
+  <g><rect x="555" y="76" width="350" height="52" rx="26" class="highlight"/><text x="730" y="98" class="name">x2cBuild&lt;Variant&gt;</text><text x="730" y="116" class="desc">读取 -Px2c.pluginMode 与统一 x2c { } DSL</text></g>
+  <g><polygon points="730,156 780,191 730,226 680,191" class="accent"/><text x="730" y="195" class="name">pluginMode?</text></g>
+
+  <!-- Plugin mode lane -->
+  <g><rect x="225" y="285" width="290" height="76" rx="7" class="primary"/><text x="370" y="314" class="name">收集当前 Variant 输入</text><text x="370" y="333" class="desc">res / Manifest / class / customViews / asset lock</text><text x="370" y="348" class="desc">只读取确定的 source set 与编译输出</text></g>
+  <g><rect x="225" y="405" width="290" height="76" rx="7" class="primary"/><text x="370" y="434" class="name">ResourceCompilationEngine</text><text x="370" y="453" class="desc">安全解析 → typed model → 引用/循环校验</text><text x="370" y="468" class="desc">synthetic R2 · CDN image metadata</text></g>
+  <g><polygon points="370,523 420,558 370,593 320,558" class="accent"/><text x="370" y="555" class="name">严格子集</text><text x="370" y="570" class="desc">全部满足?</text></g>
+  <g><rect x="50" y="635" width="145" height="76" rx="7" class="alert"/><text x="123" y="661" fill="#f8fafc" font-size="9" font-weight="600" text-anchor="middle">构建失败</text><text x="123" y="677" class="desc">FAIL CLOSED</text><text x="123" y="692" class="desc">不生成 0/null/fallback</text></g>
+  <g><rect x="225" y="635" width="290" height="76" rx="7" class="primary"/><text x="370" y="664" class="name">生成 Java source</text><text x="370" y="683" class="desc">R2 · Layouts · Values · Drawables · Images</text><text x="370" y="698" class="desc">Provider · X2cModule · namespace Bootstrap</text></g>
+  <g><rect x="225" y="753" width="290" height="76" rx="7" class="primary"/><text x="370" y="782" class="name">JavaCompile + class verifier</text><text x="370" y="801" class="desc">业务与 generated class 合并</text><text x="370" y="816" class="desc">拒绝 R/TypedArray/getIdentifier/资源 API</text></g>
+  <g><rect x="225" y="871" width="290" height="76" rx="7" class="primary"/><text x="370" y="900" class="name">确定性 codegen.jar</text><text x="370" y="919" class="desc">固定 entry / timestamp · 排除 res/R/runtime</text><text x="370" y="934" class="desc">class-only 可复现审计边界</text></g>
+  <g><rect x="225" y="989" width="290" height="76" rx="7" class="primary"/><text x="370" y="1018" class="name">ASM 组件转换 + D8</text><text x="370" y="1037" class="desc">父类/callsite/registry → activity-plugin.jar</text><text x="370" y="1052" class="desc">D8(minApi) → 单个 classes.dex</text></g>
+  <g><rect x="205" y="1101" width="330" height="58" rx="29" class="highlight"/><text x="370" y="1127" class="name">codegen-dex.jar</text><text x="370" y="1146" class="desc">可验签、可后发、无 res/assets/Manifest</text></g>
+
+  <!-- Normal mode lane -->
+  <g><rect x="945" y="285" width="290" height="76" rx="7" class="secondary"/><text x="1090" y="314" class="name">收集正常 Android Variant</text><text x="1090" y="333" class="desc">res / Manifest / bitmap / Java source</text><text x="1090" y="348" class="desc">AGP/AAPT2 resource pipeline 保持启用</text></g>
+  <g><rect x="945" y="405" width="290" height="76" rx="7" class="secondary"/><text x="1090" y="434" class="name">解析 X2C 支持的布局子集</text><text x="1090" y="453" class="desc">layout/values/drawable 仍生成 Java factory</text><text x="1090" y="468" class="desc">style/styleable 等保留给 AAPT2</text></g>
+  <g><rect x="945" y="523" width="290" height="76" rx="7" class="secondary"/><text x="1090" y="552" class="name">生成 Host-ID Provider</text><text x="1090" y="571" class="desc">R2 无状态查询 facade</text><text x="1090" y="586" class="desc">Resources.getIdentifier 首次解析并缓存</text></g>
+  <g><rect x="945" y="641" width="290" height="76" rx="7" class="secondary"/><text x="1090" y="670" class="name">JavaCompile + AAPT2</text><text x="1090" y="689" class="desc">generated source 参与业务编译</text><text x="1090" y="704" class="desc">真实 R/resource table/本地 drawable</text></g>
+  <g><rect x="945" y="759" width="290" height="76" rx="7" class="secondary"/><text x="1090" y="788" class="name">Manifest / resource merge</text><text x="1090" y="807" class="desc">library 组件声明正常合入宿主</text><text x="1090" y="822" class="desc">组件由 Android framework 原生创建</text></g>
+  <g><rect x="945" y="877" width="290" height="76" rx="7" class="secondary"/><text x="1090" y="906" class="name">assemble&lt;Variant&gt;</text><text x="1090" y="925" class="desc">classes.jar + res + Manifest + resource table</text><text x="1090" y="940" class="desc">不执行组件 ASM transform</text></g>
+  <g><rect x="945" y="995" width="290" height="76" rx="7" class="secondary"/><text x="1090" y="1024" class="name">Artifact / report 校验</text><text x="1090" y="1043" class="desc">HOST_RESOURCE_IDS · AAR entries</text><text x="1090" y="1058" class="desc">本地图片通过宿主 Resources 同步读取</text></g>
+  <g><rect x="925" y="1101" width="330" height="58" rx="29" class="highlight"/><text x="1090" y="1127" class="name">library-&lt;variant&gt;.aar</text><text x="1090" y="1146" class="desc">标准依赖、Manifest merge、原生资源语义</text></g>
+
+  <!-- Failure notes -->
+  <g><rect x="50" y="995" width="145" height="70" rx="7" class="alert"/><text x="123" y="1021" fill="#f8fafc" font-size="9" font-weight="600" text-anchor="middle">Verifier 失败</text><text x="123" y="1038" class="desc">立即终止，不进入 D8</text><text x="123" y="1053" class="desc">report 保留定位信息</text></g>
+  <g><rect x="775" y="990" width="140" height="76" rx="7" class="alert"/><text x="845" y="1017" fill="#f8fafc" font-size="9" font-weight="600" text-anchor="middle">错误任务组合</text><text x="845" y="1034" class="desc">normal 执行 JAR/D8</text><text x="845" y="1049" class="desc">或 component transform</text><text x="845" y="1062" class="desc">显式失败</text></g>
+
+  <text x="730" y="1206" fill="#64748b" font-size="9" text-anchor="middle">统一入口选择正确依赖边；不要在同一次 Gradle invocation 中对同一 module 混用两种 mode</text>
+</svg>

@@ -4,6 +4,16 @@
 
 当前实现是一个可运行的 strict MVP，而不是对任意 Android 资源系统的无损替代。插件模式遇到未知资源、qualifier、Manifest 组件或未锁定的图片时会失败；普通 AAR 模式会保留并正常合并 Library Manifest。
 
+## 架构与设计
+
+- [整体架构与完整设计](docs/ARCHITECTURE.md)
+- [总体架构图](diagram/x2c-architecture/overall-architecture.svg)
+- [plugin/normal 双模式构建流程图](diagram/x2c-architecture/build-flow.svg)
+- [动态插件安装与运行时序列图](diagram/x2c-architecture/runtime-sequence.svg)
+- [Activity 插件设计](docs/ACTIVITY_PLUGIN.md)
+- [Android 插件组件协议](docs/PLUGIN_COMPONENTS.md)
+- [pluginMode 安全切换指南](docs/PLUGIN_MODE.md)
+
 ## 编译器结构
 
 对外入口固定为 `dev.x2c.compiler.ResourceCompiler`；原有 overload 保持兼容，新增带 `pluginMode` 的完整入口。实现位于 `dev.x2c.compiler.resource`，按稳定流水线拆分：
