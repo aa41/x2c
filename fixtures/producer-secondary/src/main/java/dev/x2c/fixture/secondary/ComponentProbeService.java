@@ -15,6 +15,7 @@ public final class ComponentProbeService extends BasePluginService {
 
     @Override public void onCreate() {
         super.onCreate();
+        ComponentState.verifyHostApplication(this, ComponentProbeService.class);
         ComponentState.service = "Service: onCreate · base="
                 + BasePluginService.class.getSimpleName();
     }

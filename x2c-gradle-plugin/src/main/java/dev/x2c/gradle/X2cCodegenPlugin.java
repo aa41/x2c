@@ -34,7 +34,19 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
     @Override
     public void apply(final Project project) {
         final X2cExtension extension = project.getExtensions().create("x2c", X2cExtension.class);
-        extension.getPluginMode().convention(pluginModeConvention(project));
+        if (project.hasProperty("x2c.pluginMode")) {
+            extension.getPluginMode().set(pluginModeConvention(project));
+        }
+        if (project.hasProperty("x2c.enable")) {
+            extension.getX2cEnable().convention(booleanConvention(project, "x2c.enable", true));
+        } else {
+            extension.getX2cEnable().convention(project.provider(() ->
+                    extension.getPluginMode().isPresent()
+                            || extension.getGeneratedPackage().isPresent()
+                            || extension.getAssetLockFile().isPresent()
+                            || extension.getCustomViewsFile().isPresent()
+                            || !extension.getPluginId().getOrElse("").isEmpty()));
+        }
         extension.getPluginId().convention("");
         extension.getMinApi().convention(21);
 
@@ -55,13 +67,19 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
     }
 
     private static boolean pluginModeConvention(Project project) {
-        Object configured = project.findProperty("x2c.pluginMode");
-        if (configured == null) return true;
+        return booleanConvention(project, "x2c.pluginMode", true);
+    }
+
+    private static boolean booleanConvention(
+            Project project, String propertyName, boolean defaultValue) {
+        Object configured = project.findProperty(propertyName);
+        if (configured == null) return defaultValue;
         String value = String.valueOf(configured).trim();
         if ("true".equalsIgnoreCase(value)) return true;
         if ("false".equalsIgnoreCase(value)) return false;
         throw new GradleException(
-                "Gradle property x2c.pluginMode must be exactly true or false, but was: "
+                "Gradle property " + propertyName
+                        + " must be exactly true or false, but was: "
                         + configured);
     }
 
@@ -94,6 +112,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                     public void execute(GenerateX2cTask task) {
                         task.setGroup("x2c");
                         task.setDescription("Compiles Android resources into Java source for " + variant.getName());
+                        task.getX2cEnable().set(extension.getX2cEnable());
                         task.getResourceDirectories().from(resourceDirectories(variant));
                         task.getManifestFiles().from(manifestFiles(variant));
                         if (extension.getGeneratedPackage().isPresent()) {
@@ -104,7 +123,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                         task.getModuleNamespace().set(androidNamespace(android, variant));
                         task.getVariantName().set(variant.getName());
                         task.getMinApi().set(extension.getMinApi());
-                        task.getPluginMode().set(extension.getPluginMode());
+                        task.getPluginMode().set(extension.getPluginMode().orElse(extension.getX2cEnable()));
                         task.getOutputDirectory().set(generatedJavaDirectory);
                         task.getReportDirectory().set(new File(
                                 project.getBuildDir(), "reports/x2c/" + variant.getName()));
@@ -139,7 +158,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                     public void execute(PackageCodegenJarTask task) {
                         task.setGroup("x2c");
                         task.setDescription("Creates a deterministic class-only JAR for " + variant.getName());
-                        task.getPluginMode().set(extension.getPluginMode());
+                        task.getPluginMode().set(extension.getPluginMode().orElse(extension.getX2cEnable()));
                         task.dependsOn(variant.getJavaCompileProvider());
                         task.getInputDirectories().from(project.provider(new java.util.concurrent.Callable<File>() {
                             @Override
@@ -170,7 +189,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                                 d8Executable.getParentFile(), "lib/d8.jar"));
                         task.getBootClasspath().from(android.getBootClasspath());
                         task.getMinApi().set(extension.getMinApi());
-                        task.getPluginMode().set(extension.getPluginMode());
+                        task.getPluginMode().set(extension.getPluginMode().orElse(extension.getX2cEnable()));
                         task.getOutputJar().set(new File(
                                 project.getBuildDir(), "outputs/x2c/" + variant.getName() + "/codegen-dex.jar"));
                     }
@@ -195,7 +214,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                 buildArtifact.configure(new Action<Task>() {
                     @Override
                     public void execute(Task task) {
-                        if (extension.getPluginMode().get()) {
+                        if (extension.getPluginMode().getOrElse(extension.getX2cEnable().get())) {
                             task.dependsOn(dex);
                         } else {
                             task.dependsOn(variant.getAssembleProvider());

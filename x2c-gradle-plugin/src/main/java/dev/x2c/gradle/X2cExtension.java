@@ -4,6 +4,12 @@ import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.provider.Property;
 
 public abstract class X2cExtension {
+    /** Defaults to true for a configured module; no settings or explicit false uses Resources. */
+    public abstract Property<Boolean> getX2cEnable();
+
+    /** Lower-case DSL spelling supported alongside x2cEnable. */
+    public Property<Boolean> getX2cenable() { return getX2cEnable(); }
+
     /** True for resource-free/dynamic plugins; false for normal Android resource integration. */
     public abstract Property<Boolean> getPluginMode();
 

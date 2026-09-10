@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <fraction name="card_width">92%</fraction>
-    <fraction name="parent_emphasis">25%p</fraction>
 </resources>

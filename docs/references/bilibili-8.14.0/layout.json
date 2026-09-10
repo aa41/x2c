@@ -1,0 +1,98 @@
+{
+  "sourceReference": "docs/references/bilibili-8.14.0/home.png",
+  "referenceCanvas": {
+    "width": 1080,
+    "height": 2460
+  },
+  "targetViewport": {
+    "width": 1080.0
+  },
+  "scale": 1.0,
+  "sections": [
+    {
+      "x": 0.0,
+      "y": 76.0,
+      "w": 1080.0,
+      "h": 142.0,
+      "xPct": 0.0,
+      "yPct": 0.030894,
+      "wPct": 1.0,
+      "hPct": 0.057724,
+      "aspect": 7.605634,
+      "name": "header"
+    },
+    {
+      "x": 0.0,
+      "y": 218.0,
+      "w": 1080.0,
+      "h": 99.0,
+      "xPct": 0.0,
+      "yPct": 0.088618,
+      "wPct": 1.0,
+      "hPct": 0.040244,
+      "aspect": 10.909091,
+      "name": "channels"
+    },
+    {
+      "x": 0.0,
+      "y": 317.0,
+      "w": 1080.0,
+      "h": 1976.0,
+      "xPct": 0.0,
+      "yPct": 0.128862,
+      "wPct": 1.0,
+      "hPct": 0.803252,
+      "aspect": 0.546559,
+      "name": "content"
+    },
+    {
+      "x": 0.0,
+      "y": 2293.0,
+      "w": 1080.0,
+      "h": 125.0,
+      "xPct": 0.0,
+      "yPct": 0.932114,
+      "wPct": 1.0,
+      "hPct": 0.050813,
+      "aspect": 8.64,
+      "name": "bottom"
+    }
+  ],
+  "regions": {
+    "banner": {
+      "x": 24.0,
+      "y": 329.0,
+      "w": 1042.0,
+      "h": 592.0,
+      "xPct": 0.022222,
+      "yPct": 0.13374,
+      "wPct": 0.964815,
+      "hPct": 0.24065,
+      "aspect": 1.760135,
+      "fit": "contain"
+    },
+    "firstCover": {
+      "x": 12.0,
+      "y": 935.0,
+      "w": 521.0,
+      "h": 391.0,
+      "xPct": 0.011111,
+      "yPct": 0.380081,
+      "wPct": 0.482407,
+      "hPct": 0.158943,
+      "aspect": 1.332481,
+      "fit": "contain"
+    }
+  },
+  "grid": {
+    "containerX": 12.0,
+    "containerW": 1056.0,
+    "columns": 2,
+    "gutter": 14.0
+  },
+  "notes": [
+    "Use section heights and region boxes as the desktop composition baseline.",
+    "Prefer percentages for responsive scaling, but preserve these proportions at the reference viewport.",
+    "Manually verify fold position and dominant asset bounding boxes with browser screenshots."
+  ]
+}

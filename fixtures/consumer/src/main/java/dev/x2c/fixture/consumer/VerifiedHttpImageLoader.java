@@ -8,6 +8,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.widget.ImageView;
 import dev.x2c.runtime.ImageAsset;
+import dev.x2c.runtime.ImageLoadAdapter;
 import dev.x2c.runtime.ImageLoadListener;
 import dev.x2c.runtime.ImageLoader;
 import dev.x2c.runtime.ImageRequest;
@@ -39,7 +40,7 @@ final class VerifiedHttpImageLoader implements ImageLoader {
 
     @Override
     public ImageRequest load(ImageView target, ImageAsset asset) {
-        return load(target, asset, new ImageLoadListener() {});
+        return load(target, asset, ImageLoadAdapter.NONE);
     }
 
     @Override

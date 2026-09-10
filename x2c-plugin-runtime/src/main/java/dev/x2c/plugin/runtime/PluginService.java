@@ -73,7 +73,8 @@ public abstract class PluginService extends Service {
     }
 
     public final Application getPluginApplication() {
-        return requireContainer().getApplication();
+        requireContainer();
+        return dev.x2c.runtime.X2C.hostApplication();
     }
 
     public final void stopPluginSelf() {

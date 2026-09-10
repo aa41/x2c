@@ -27,7 +27,7 @@ public final class X2cActivityPlugin implements Plugin<Project> {
                         "dev.x2c.activity-plugin requires com.android.library and dev.x2c.codegen");
             }
             X2cExtension x2c = project.getExtensions().getByType(X2cExtension.class);
-            if (x2c.getPluginMode().get()
+            if (x2c.getPluginMode().getOrElse(x2c.getX2cEnable().get())
                     && (!x2c.getPluginId().isPresent()
                     || x2c.getPluginId().get().trim().isEmpty())) {
                 throw new GradleException("Configure x2c.pluginId");
@@ -54,7 +54,7 @@ public final class X2cActivityPlugin implements Plugin<Project> {
                             // invocation reaches the explicit pluginMode guard instead of failing
                             // Gradle property validation with an unrelated missing-value message.
                             task.getPluginId().set(x2c.getPluginId());
-                            task.getPluginMode().set(x2c.getPluginMode());
+                            task.getPluginMode().set(x2c.getPluginMode().orElse(x2c.getX2cEnable()));
                             // Runtime configuration is the complete transitive dependency closure
                             // of this Android variant. The task accepts JARs, class directories and
                             // resource-free AARs, then applies one transform to all retained classes.

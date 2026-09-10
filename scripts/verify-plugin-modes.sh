@@ -63,4 +63,31 @@ if "$task_root/gradlew" -p "$task_root" \
 fi
 rg -q 'x2c.pluginMode must be exactly true or false' "$task_failure_log"
 
-echo "X2C pluginMode true/false verification passed"
+"$task_root/scripts/build-x2c-artifact.sh" \
+    --module :fixtures:producer --mode normal --x2c-enable false --variant release \
+    -- --offline --no-configuration-cache
+rg -q '"mode": "SYSTEM_RESOURCES"' "$task_normal_report"
+[[ -z $(find "$task_root/fixtures/producer/build/generated/java/x2cGenerateRelease" -name '*.java' -print -quit) ]]
+task_classes=$(mktemp "${TMPDIR:-/tmp}/x2c-system-classes.XXXXXX")
+unzip -p "$task_aar" classes.jar > "$task_classes"
+if unzip -Z1 "$task_classes" | rg '/(X2cModule|X2cLayouts|R2)\.class$'; then
+    rm -f "$task_classes"
+    echo "Disabled AAR contains stale generated classes" >&2
+    exit 1
+fi
+rm -f "$task_classes"
+
+if "$task_root/gradlew" -p "$task_root" :fixtures:producer:x2cGenerateRelease \
+    -Px2c.enable=false -Px2c.pluginMode=true --offline --no-configuration-cache \
+    >"$task_failure_log" 2>&1; then
+    echo "Disabled codegen unexpectedly accepted plugin mode" >&2
+    exit 1
+fi
+rg -q 'x2cEnable=false requires pluginMode=false' "$task_failure_log"
+
+# Switch back without clean: both source generation and compilation must recover.
+"$task_root/scripts/build-x2c-artifact.sh" \
+    --module :fixtures:producer --mode plugin --variant release \
+    -- --offline --no-configuration-cache
+rg -q '"mode": "PLUGIN_SYNTHETIC_IDS"' "$task_plugin_report"
+echo "X2C pluginMode and x2cEnable switching verification passed"

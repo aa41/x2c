@@ -42,6 +42,7 @@ afterEvaluate {
 }
 
 dependencies {
+    implementation(project(":x2c-runtime"))
     api(project(":x2c-plugin-api"))
 }
 

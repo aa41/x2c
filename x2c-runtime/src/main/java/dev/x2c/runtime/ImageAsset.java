@@ -2,7 +2,7 @@ package dev.x2c.runtime;
 
 import java.util.Objects;
 
-/** Immutable, content-addressed metadata for a bitmap moved to HTTPS CDN storage. */
+/** Image metadata: CDN assets have a hash/size; packaged resource descriptors leave them empty/zero. */
 public final class ImageAsset {
     public final String moduleName;
     public final String name;

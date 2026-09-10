@@ -1,0 +1,3 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <QuickContactBadge android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="QuickContactBadge XML 构造示例" android:tag="QuickContactBadge" android:src="@drawable/matrix_gradient" />
+</LinearLayout>

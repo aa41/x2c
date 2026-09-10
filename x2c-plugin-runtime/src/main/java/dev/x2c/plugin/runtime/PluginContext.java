@@ -22,9 +22,7 @@ final class PluginContext extends ContextWrapper {
     }
 
     @Override public Context getApplicationContext() {
-        Context application = getBaseContext().getApplicationContext();
-        if (application == null || application == getBaseContext()) return this;
-        return new PluginContext(application, pluginId, pluginClassLoader);
+        return dev.x2c.runtime.X2C.hostApplication();
     }
 
     @Override public ClassLoader getClassLoader() {

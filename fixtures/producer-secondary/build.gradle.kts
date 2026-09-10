@@ -4,6 +4,18 @@ plugins {
     id("dev.x2c.activity-plugin")
 }
 
+val x2cCodegenEnabled = providers.gradleProperty("x2c.enable")
+    .map { value ->
+        when (value.trim().lowercase()) {
+            "true" -> true
+            "false" -> false
+            else -> error(
+                "Gradle property x2c.enable must be exactly true or false, but was: $value",
+            )
+        }
+    }
+    .orElse(true)
+
 dependencies {
     compileOnly(project(":fixtures:business-base"))
     compileOnly(project(":x2c-runtime"))
@@ -30,8 +42,9 @@ android {
 }
 
 x2c {
-    // pluginMode defaults to true and can be supplied with -Px2c.pluginMode=true.
     // This fixture intentionally keeps plugin-only dependency and Manifest configuration.
+    x2cEnable.set(x2cCodegenEnabled)
+    pluginMode.set(true)
     pluginId.set("dev.x2c.fixture.component-showcase")
     generatedPackage.set("dev.x2c.fixture.secondary.generated")
     assetLockFile.set(layout.projectDirectory.file("x2c-assets.lock.json"))

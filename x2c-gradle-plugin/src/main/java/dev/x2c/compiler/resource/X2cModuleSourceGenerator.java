@@ -13,12 +13,17 @@ final class X2cModuleSourceGenerator {
         out.line("import android.view.View;");
         out.line("import dev.x2c.runtime.LayoutFactory;");
         out.line("import dev.x2c.runtime.X2C;");
+        if (pluginMode) {
+            out.line("import dev.x2c.runtime.X2cResourceProvider;");
+        }
         out.line("import java.util.Objects;");
         out.blank();
         out.open("public final class X2cModule");
         out.line("public static final String NAME = \"" + packageName + "\";");
         out.line("private static volatile boolean initialized;");
-        if (!pluginMode) {
+        if (pluginMode) {
+            out.line("private static volatile X2cResourceProvider provider;");
+        } else {
             out.line("private static volatile X2cResourceProviderImpl provider;");
         }
         out.line("private X2cModule() {}");
@@ -29,8 +34,15 @@ final class X2cModuleSourceGenerator {
         out.open("synchronized (X2cModule.class)");
         out.line("if (initialized) return;");
         out.line("X2C.requireInitialized(context);");
-        out.line("X2cResourceProviderImpl created = new X2cResourceProviderImpl("
-                + (pluginMode ? "" : "context") + ");");
+        if (pluginMode) {
+            out.line("X2cResourceProvider created = X2C.createPluginResourceProvider("
+                    + "context, new X2cResourceProviderImpl());");
+            // Publish before registration so generated drawable/value dependency lookups are safe
+            // as soon as the provider becomes visible through the host registry.
+            out.line("provider = created;");
+        } else {
+            out.line("X2cResourceProviderImpl created = new X2cResourceProviderImpl(context);");
+        }
         out.line("X2C.registerResourceProvider(NAME, created);");
         if (hasImages) {
             out.line("X2cImages.register();");
@@ -68,6 +80,13 @@ final class X2cModuleSourceGenerator {
             out.line("X2cResourceProviderImpl current = provider;");
             out.line("if (current == null) throw new IllegalStateException(\"X2cModule.init(context) must be called before resolving resources for \" + NAME);");
             out.line("return current.getIdentifier(type, name);");
+            out.close();
+        } else {
+            out.blank();
+            out.open("static X2cResourceProvider provider()");
+            out.line("X2cResourceProvider current = provider;");
+            out.line("if (current == null) throw new IllegalStateException(\"X2cModule.init(context) must complete before resolving plugin resources for \" + NAME);");
+            out.line("return current;");
             out.close();
         }
         out.close();

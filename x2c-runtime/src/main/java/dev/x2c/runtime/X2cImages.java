@@ -43,7 +43,7 @@ public final class X2cImages {
     }
 
     public static void load(ImageView target, String moduleName, String name) {
-        load(target, moduleName, name, new ImageLoadListener() {});
+        load(target, moduleName, name, ImageLoadAdapter.NONE);
     }
 
     public static void load(
@@ -53,12 +53,13 @@ public final class X2cImages {
             ImageLoadListener listener) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(listener, "listener");
+        ImageAsset asset = get(moduleName, name);
+        cancel(target);
         ImageLoader current = loader;
         if (current == null) {
             throw new IllegalStateException("Install host X2cImages.setLoader(...) before loading CDN images");
         }
-        cancel(target);
-        ImageRequest request = current.load(target, get(moduleName, name), listener);
+        ImageRequest request = current.load(target, asset, listener);
         if (request != null) {
             REQUESTS.put(target, request);
         }

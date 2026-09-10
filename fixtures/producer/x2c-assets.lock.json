@@ -7,6 +7,20 @@
       "sha256": "567cdec892c6f4a140706350f057fe98fc3871bca7fa1217f8be88c7f5b34b5b",
       "mime": "image/jpeg",
       "bytes": 32725
+    },
+    {
+      "name": "plugin_portrait_blue",
+      "url": "https://img2.baidu.com/it/u=753222566,97969479&fm=253&fmt=auto&app=120&f=JPEG?w=500&h=750",
+      "sha256": "d18e50884dc66e02abb5e40010d25dc7866e6c5086cf1f92ed3e621d3ec8c1fa",
+      "mime": "image/jpeg",
+      "bytes": 27727
+    },
+    {
+      "name": "plugin_portrait_night",
+      "url": "https://img0.baidu.com/it/u=4030504654,221864072&fm=253&fmt=auto&app=120&f=JPEG?w=500&h=1111",
+      "sha256": "49e8f5832a38616fc97b6eaa0fdc95767efe8b37cfc6b1764390beae3259fc13",
+      "mime": "image/jpeg",
+      "bytes": 44498
     }
   ]
 }

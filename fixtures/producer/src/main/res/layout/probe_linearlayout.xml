@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <LinearLayout android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="LinearLayout XML 构造示例" android:tag="LinearLayout" android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/probe_child" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:gravity="center" android:background="@color/primary_soft" android:text="权重 1"/>
+        <TextView android:id="@+id/probe_child_secondary" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="2" android:layout_marginLeft="8dp" android:gravity="center" android:background="@color/success_soft" android:text="权重 2"/>
+    </LinearLayout>
+</LinearLayout>

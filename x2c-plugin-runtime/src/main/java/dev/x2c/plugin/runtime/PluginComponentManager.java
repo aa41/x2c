@@ -68,6 +68,8 @@ public final class PluginComponentManager {
                             + ", plugin=" + runtimeAbi);
         }
         String pluginId = requirePluginId(registry.pluginId());
+        dev.x2c.runtime.X2C.requireInitialized(context);
+        dev.x2c.runtime.X2C.registerPluginClassLoader(pluginClassLoader);
 
         synchronized (INSTALL_LOCK) {
             if (INSTALLED_PLUGIN_IDS.contains(pluginId)

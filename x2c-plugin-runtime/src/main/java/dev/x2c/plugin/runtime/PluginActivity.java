@@ -83,6 +83,15 @@ public abstract class PluginActivity extends Activity {
         return requireContainer();
     }
 
+    /** Activity's native window fields are not attached on the delegate instance. */
+    @Override public android.view.WindowManager getWindowManager() {
+        return requireContainer().getWindowManager();
+    }
+
+    @Override public Object getSystemService(String name) {
+        return requireContainer().getSystemService(name);
+    }
+
     public final String getPluginId() {
         requireContainer();
         return pluginId;
@@ -94,7 +103,8 @@ public abstract class PluginActivity extends Activity {
 
     /** Target for compile-time rewriting of Activity#getApplication, which is final. */
     public final Application getPluginApplication() {
-        return requireContainer().getApplication();
+        requireContainer();
+        return dev.x2c.runtime.X2C.hostApplication();
     }
 
     /** Target for compile-time rewriting of final Activity#isChild. */

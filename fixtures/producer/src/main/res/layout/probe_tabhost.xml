@@ -1,0 +1,8 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <TabHost android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="TabHost XML 构造示例" android:tag="TabHost">
+        <LinearLayout android:id="@+id/probe_child" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+            <TabWidget android:id="@android:id/tabs" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+            <FrameLayout android:id="@android:id/tabcontent" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+        </LinearLayout>
+    </TabHost>
+</LinearLayout>

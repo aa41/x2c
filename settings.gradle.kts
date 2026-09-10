@@ -34,5 +34,4 @@ include(
     ":fixtures:producer-secondary",
     ":fixtures:consumer",
     ":fixtures:normal-library",
-    ":fixtures:normal-app",
 )

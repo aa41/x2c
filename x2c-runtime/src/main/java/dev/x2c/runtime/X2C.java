@@ -1,6 +1,7 @@
 package dev.x2c.runtime;
 
 import android.app.Activity;
+import android.app.Application;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,7 +19,10 @@ import java.util.WeakHashMap;
 /** Host-resident runtime shared by statically integrated and dynamically loaded X2C modules. */
 public final class X2C {
     private static final String MODULE_BOOTSTRAP_SUFFIX = ".x2c.X2cModuleBootstrap";
+    private static final String SYSTEM_RESOURCE_MODULE = "android.resources";
     private static final Object LOCK = new Object();
+    private static final Set<ClassLoader> PLUGIN_LOADERS =
+            java.util.Collections.newSetFromMap(new WeakHashMap<ClassLoader, Boolean>());
     private static final Map<Integer, Map<String, RegisteredLayout>> LAYOUTS =
             new HashMap<Integer, Map<String, RegisteredLayout>>();
     private static final Map<String, RegisteredLayout> NAMED_LAYOUTS =
@@ -32,31 +36,85 @@ public final class X2C {
     private static volatile Context applicationContext;
     private static volatile ClassLoader hostClassLoader;
     private static volatile String hostPackageName;
+    private static volatile SystemX2cResourceProvider systemResourceProvider;
 
     private X2C() {}
 
     /** Initializes the host context and the ClassLoader used as the plugin fallback. */
     public static void init(Context context) {
         Objects.requireNonNull(context, "context");
-        if (applicationContext != null) {
-            requireInitialized(context);
-            return;
+        Context candidate = context instanceof Application ? context : applicationContext(context);
+        if (!(candidate instanceof Application)) {
+            throw new IllegalStateException("Initialize X2C with the real host Application after it is ready");
         }
-        Context candidate = applicationContext(context);
+        init((Application) candidate, candidate.getClassLoader());
+    }
+
+    /** Explicit binding for hosts whose protection SDK supplies a stable delegating loader. */
+    public static void init(Application candidate, ClassLoader loader) {
+        Objects.requireNonNull(candidate, "application");
+        Objects.requireNonNull(loader, "hostClassLoader");
+        verifyRuntimeIdentity(loader);
         String packageName = candidate.getPackageName();
-        ClassLoader loader = candidate.getClassLoader();
-        if (loader == null) {
-            loader = X2C.class.getClassLoader();
-        }
         synchronized (LOCK) {
             if (applicationContext != null) {
                 requireSameHost(packageName);
+                if (applicationContext != candidate || hostClassLoader != loader) {
+                    throw new IllegalStateException("X2C host Application/ClassLoader changed after binding; initialize only after host setup is complete");
+                }
                 return;
             }
+            SystemX2cResourceProvider provider = new SystemX2cResourceProvider(candidate);
             hostPackageName = packageName;
             hostClassLoader = loader;
+            systemResourceProvider = provider;
             // Publish last: readers that observe this volatile write also observe the host fields.
             applicationContext = candidate;
+        }
+    }
+
+    /** The single real Application shared by host and all JAR plugins. */
+    public static Application hostApplication() {
+        return (Application) requireContext();
+    }
+
+    /** Registers an external plugin's defining loader before module discovery. */
+    public static void registerPluginClassLoader(ClassLoader loader) {
+        Objects.requireNonNull(loader, "pluginClassLoader");
+        verifyRuntimeIdentity(loader);
+        synchronized (LOCK) {
+            if (loader == requireHostClassLoader() || loader == X2C.class.getClassLoader()) {
+                throw new IllegalArgumentException("Host loader cannot be registered as a plugin");
+            }
+            PLUGIN_LOADERS.add(loader);
+        }
+    }
+
+    /** Reports code ownership, not the origin of the current caller or its Context. */
+    public static boolean isPlugin(Class<?> anchorClass) {
+        Objects.requireNonNull(anchorClass, "anchorClass");
+        synchronized (LOCK) {
+            return PLUGIN_LOADERS.contains(anchorClass.getClassLoader());
+        }
+    }
+
+    private static void verifyRuntimeIdentity(ClassLoader loader) {
+        for (Class<?> type : new Class<?>[] {X2C.class, X2cResources.class, X2cResourceProvider.class}) {
+            try {
+                if (loader.loadClass(type.getName()) != type) {
+                    throw new IllegalStateException("Duplicate X2C runtime type: " + type.getName());
+                }
+            } catch (ClassNotFoundException error) {
+                throw new IllegalStateException("Loader cannot access host runtime: " + type.getName(), error);
+            }
+        }
+    }
+
+    private static boolean isHostClass(Class<?> type) {
+        try {
+            return requireHostClassLoader().loadClass(type.getName()) == type;
+        } catch (ClassNotFoundException ignored) {
+            return false;
         }
     }
 
@@ -73,6 +131,9 @@ public final class X2C {
             return;
         }
         requireSameHost(candidate.getPackageName());
+        if (candidate instanceof Application && candidate != initializedContext) {
+            throw new IllegalStateException("Context belongs to a different Application than the bound host");
+        }
     }
 
     /** Invokes a generated X2cModule through the already initialized host loader. */
@@ -176,7 +237,9 @@ public final class X2C {
             String moduleName, X2cResourceProvider provider) {
         Objects.requireNonNull(moduleName, "moduleName");
         Objects.requireNonNull(provider, "provider");
-        ClassLoader moduleLoader = provider.getClass().getClassLoader();
+        ClassLoader moduleLoader = provider instanceof PluginFirstX2cResourceProvider
+                ? ((PluginFirstX2cResourceProvider) provider).moduleClassLoader()
+                : provider.getClass().getClassLoader();
         synchronized (LOCK) {
             X2cResourceProvider previous = RESOURCE_PROVIDERS.get(moduleName);
             if (previous != null && previous != provider) {
@@ -196,6 +259,34 @@ public final class X2C {
         }
     }
 
+    /**
+     * Creates the plugin-first resource provider used only by generated plugin-mode modules.
+     *
+     * <p>Resources declared by the plugin remain backed by generated classes and synthetic IDs.
+     * Supported names absent from the plugin may resolve through the initialized host package.
+     * Normal AAR modules never call this method.</p>
+    */
+    public static X2cResourceProvider createPluginResourceProvider(
+            Context context, X2cResourceProvider plugin) {
+        requireInitialized(context);
+        return new PluginFirstX2cResourceProvider(requireContext(), plugin);
+    }
+
+    /** Clears cached host name lookups, for example after installing a dynamic feature split. */
+    public static void invalidatePluginResourceCaches() {
+        SystemX2cResourceProvider system = systemResourceProvider;
+        if (system != null) {
+            system.clearIdentifierCache();
+        }
+        synchronized (LOCK) {
+            for (X2cResourceProvider provider : RESOURCE_PROVIDERS.values()) {
+                if (provider instanceof PluginFirstX2cResourceProvider) {
+                    ((PluginFirstX2cResourceProvider) provider).clearIdentifierCache();
+                }
+            }
+        }
+    }
+
     public static X2cResources resources(String moduleName) {
         Objects.requireNonNull(moduleName, "moduleName");
         X2cResourceProvider provider;
@@ -208,6 +299,17 @@ public final class X2C {
                             + ". Call X2C.loadModule(context, moduleClassName, pluginClassLoader) first.");
         }
         return new X2cResources(moduleName, provider);
+    }
+
+    /** Returns a runtime-only facade backed entirely by the host Android resource table. */
+    public static X2cResources resources(Context context) {
+        requireInitialized(context);
+        SystemX2cResourceProvider provider = systemResourceProvider;
+        if (provider == null) {
+            throw new IllegalStateException("X2C system resource provider is not initialized");
+        }
+        return X2cResources.system(SYSTEM_RESOURCE_MODULE + "/" + hostPackageName,
+                new SystemX2cResourceProvider(context));
     }
 
     /**
@@ -234,12 +336,31 @@ public final class X2C {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(anchorClass, "anchorClass");
         requireInitialized(context);
+        if (!isPlugin(anchorClass) && !isHostClass(anchorClass)) {
+            throw new IllegalStateException("Unknown code owner; register the plugin defining ClassLoader before use: " + anchorClass.getName());
+        }
         String moduleName;
         synchronized (LOCK) {
             moduleName = MODULES_BY_ANCHOR.get(anchorClass);
         }
+        if (SYSTEM_RESOURCE_MODULE.equals(moduleName)) {
+            return resources(context);
+        }
         if (moduleName == null) {
-            moduleName = discoverModule(context, anchorClass);
+            moduleName = discoverModuleOrNull(context, anchorClass);
+            if (moduleName == null) {
+                ClassLoader anchorLoader = anchorClass.getClassLoader();
+                if (!isPlugin(anchorClass)) {
+                    synchronized (LOCK) {
+                        MODULES_BY_ANCHOR.put(anchorClass, SYSTEM_RESOURCE_MODULE);
+                    }
+                    return resources(context);
+                }
+                throw new IllegalStateException(
+                        "Cannot discover an X2C module for " + anchorClass.getName()
+                                + " from ClassLoader " + anchorLoader
+                                + ". Dynamic plugins must enable X2C code generation.");
+            }
             synchronized (LOCK) {
                 MODULES_BY_ANCHOR.put(anchorClass, moduleName);
             }
@@ -325,6 +446,16 @@ public final class X2C {
     public static void setContentView(Activity activity, int layoutId) {
         Objects.requireNonNull(activity, "activity");
         activity.setContentView(getView(activity, layoutId));
+    }
+
+    /**
+     * Sets a generated layout when the Activity owns an enabled X2C module, otherwise resolves the
+     * name from the host Android resource table.
+     */
+    public static void setContentView(Activity activity, String layoutName) {
+        Objects.requireNonNull(activity, "activity");
+        Objects.requireNonNull(layoutName, "layoutName");
+        resources(activity, activity.getClass()).setContentView(activity, layoutName);
     }
 
     public static void setContentView(Activity activity, String moduleName, String layoutName) {
@@ -480,6 +611,7 @@ public final class X2C {
     }
 
     private static Context applicationContext(Context context) {
+        if (context instanceof Application) return context;
         Context application = context.getApplicationContext();
         return application == null ? context : application;
     }
@@ -493,7 +625,7 @@ public final class X2C {
         }
     }
 
-    private static String discoverModule(Context context, Class<?> anchorClass) {
+    private static String discoverModuleOrNull(Context context, Class<?> anchorClass) {
         ClassLoader anchorLoader = anchorClass.getClassLoader();
         if (anchorLoader == null) {
             anchorLoader = requireHostClassLoader();
@@ -509,17 +641,44 @@ public final class X2C {
             }
             // A plugin-first loader may fall back to a host class with the same package prefix.
             // It must never claim that host bootstrap as the plugin's module.
-            if (bootstrap != null && bootstrap.getClassLoader() == anchorLoader) {
+            if (bootstrap != null && (bootstrap.getClassLoader() == anchorLoader
+                    || (!isPlugin(anchorClass) && isHostClass(bootstrap)))) {
                 return initializeBootstrap(context, anchorClass, bootstrap);
             }
             int separator = packageName.lastIndexOf('.');
             packageName = separator < 0 ? "" : packageName.substring(0, separator);
         }
 
-        throw new IllegalStateException(
-                "Cannot discover an X2C module for " + anchorClass.getName()
-                        + " from ClassLoader " + anchorLoader
-                        + ". Rebuild the library with the current X2C Gradle plugin.");
+        return null;
+    }
+
+    static void setSystemContentView(Activity activity, String layoutName) {
+        Objects.requireNonNull(activity, "activity");
+        activity.setContentView(requireSystemIdentifier(activity, "layout", layoutName));
+    }
+
+    static View getSystemView(Context context, String layoutName) {
+        return inflateSystem(context, layoutName, null, false);
+    }
+
+    static View inflateSystem(
+            Context context, String layoutName, ViewGroup parent, boolean attachToRoot) {
+        Objects.requireNonNull(context, "context");
+        Objects.requireNonNull(layoutName, "layoutName");
+        if (attachToRoot && parent == null) {
+            throw new IllegalArgumentException("attachToRoot requires a non-null parent");
+        }
+        int layoutId = requireSystemIdentifier(context, "layout", layoutName);
+        return LayoutInflater.from(context).inflate(layoutId, parent, attachToRoot);
+    }
+
+    private static int requireSystemIdentifier(Context context, String type, String name) {
+        requireInitialized(context);
+        SystemX2cResourceProvider provider = systemResourceProvider;
+        if (provider == null) {
+            throw new IllegalStateException("X2C system resource provider is not initialized");
+        }
+        return provider.getIdentifier(type, name);
     }
 
     private static String initializeBootstrap(

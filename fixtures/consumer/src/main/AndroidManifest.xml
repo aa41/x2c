@@ -4,7 +4,7 @@
     <application
         android:name=".HostApplication"
         android:allowBackup="false"
-        android:label="X2C JAR Consumer"
+        android:label="X2C 三合一实验室"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"

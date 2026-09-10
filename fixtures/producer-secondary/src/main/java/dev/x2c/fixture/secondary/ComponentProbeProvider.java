@@ -20,6 +20,11 @@ public final class ComponentProbeProvider extends BasePluginProvider {
     private int revision;
 
     @Override public boolean onCreate() {
+        // Native Providers may be created before Application.onCreate; plugin Providers are
+        // installed explicitly after host initialization.
+        if (dev.x2c.runtime.X2C.isInitialized()) {
+            ComponentState.verifyHostApplication(getContext(), ComponentProbeProvider.class);
+        }
         ComponentState.provider = "Provider: onCreate";
         return true;
     }

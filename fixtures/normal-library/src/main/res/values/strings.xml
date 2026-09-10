@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="normal_library_name">X2C Standard AAR</string>
     <string name="normal_title">普通 AAR 集成模式</string>
-    <string name="normal_subtitle">资源保留在 AAR，Provider 按需缓存宿主的真实资源 ID。</string>
-    <string name="normal_action">运行点击逻辑</string>
-    <string name="normal_close">返回宿主</string>
     <string name="normal_click_count">已完成 %1$d 次标准 View 点击</string>
 </resources>

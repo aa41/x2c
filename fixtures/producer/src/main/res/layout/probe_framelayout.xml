@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <FrameLayout android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="FrameLayout XML 构造示例" android:tag="FrameLayout">
+        <ImageView android:id="@+id/probe_child" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/matrix_gradient" android:scaleType="centerCrop"/>
+        <TextView android:id="@+id/probe_child_secondary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="bottom|right" android:layout_margin="12dp" android:padding="8dp" android:background="@color/primary" android:textColor="#FFFFFF" android:text="右下角覆盖层"/>
+    </FrameLayout>
+</LinearLayout>

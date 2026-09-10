@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <TableRow android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="TableRow XML 构造示例" android:tag="TableRow">
+        <TextView android:id="@+id/probe_child" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:gravity="center" android:background="@color/primary_soft" android:text="单元 A"/>
+        <TextView android:id="@+id/probe_child_secondary" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:gravity="center" android:background="@color/success_soft" android:text="单元 B"/>
+    </TableRow>
+</LinearLayout>

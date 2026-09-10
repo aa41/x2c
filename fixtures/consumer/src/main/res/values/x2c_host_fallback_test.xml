@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same-name value: the plugin-generated value must remain authoritative. -->
+    <string name="library_name">HOST VALUE MUST NOT OVERRIDE THE PLUGIN</string>
+
+    <!-- Host-only values exercise every lossless plugin-mode fallback family. -->
+    <string name="x2c_host_only_string">Host fallback active</string>
+    <color name="x2c_host_only_color">#FF246BFD</color>
+    <bool name="x2c_host_only_bool">true</bool>
+    <integer name="x2c_host_only_integer">37</integer>
+    <dimen name="x2c_host_only_dimen">12dp</dimen>
+    <fraction name="x2c_host_only_fraction">25%</fraction>
+    <string-array name="x2c_host_only_strings">
+        <item>host-a</item>
+        <item>host-b</item>
+    </string-array>
+    <integer-array name="x2c_host_only_integers">
+        <item>7</item>
+        <item>11</item>
+    </integer-array>
+    <item name="x2c_host_only_id" type="id" />
+</resources>

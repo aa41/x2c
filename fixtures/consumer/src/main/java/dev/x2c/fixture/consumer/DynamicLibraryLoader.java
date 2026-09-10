@@ -1,6 +1,7 @@
 package dev.x2c.fixture.consumer;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.util.Base64;
 import dev.x2c.fixture.businessbase.BusinessBaseActivity;
 import dev.x2c.fixture.businessbase.analytics.BusinessLifecycleAnalytics;
@@ -11,6 +12,7 @@ import dev.x2c.plugin.loader.PluginPackage;
 import dev.x2c.plugin.loader.SignedPluginInstaller;
 import dev.x2c.plugin.runtime.PluginActivity;
 import dev.x2c.plugin.runtime.PluginComponentManager;
+import dev.x2c.runtime.ImageAsset;
 import dev.x2c.runtime.PluginClassLoader;
 import dev.x2c.runtime.X2C;
 import dev.x2c.runtime.X2cResourceProvider;
@@ -55,6 +57,7 @@ public final class DynamicLibraryLoader {
     private static volatile File installedComponentPayload;
     private static volatile String installedLayoutDigest;
     private static volatile String installedComponentDigest;
+    private static volatile String resourceResolutionSummary;
 
     private DynamicLibraryLoader() {}
 
@@ -89,6 +92,7 @@ public final class DynamicLibraryLoader {
                 || !resourcesFromAnchor.hasResource("framework_matrix", "layout")) {
             throw new IllegalStateException("Plugin module was not registered against its ClassLoader");
         }
+        resourceResolutionSummary = verifyPluginFirstResources(appContext, resources);
 
         // Load a second physical DEX JAR through a second ClassLoader after the first module has
         // registered. Both resource handles must remain independently addressable.
@@ -143,43 +147,6 @@ public final class DynamicLibraryLoader {
         componentClassLoader = component.loader;
     }
 
-    public static ClassLoader requireLayoutClassLoader() throws ClassNotFoundException {
-        PluginClassLoader current = layoutClassLoader;
-        if (current == null) {
-            throw new ClassNotFoundException("X2C DEX payload was not installed by HostApplication");
-        }
-        return current;
-    }
-
-    public static ClassLoader requireComponentClassLoader() throws ClassNotFoundException {
-        PluginClassLoader current = componentClassLoader;
-        if (current == null) {
-            throw new ClassNotFoundException(
-                    "Component showcase DEX payload was not installed by HostApplication");
-        }
-        return current;
-    }
-
-    public static String libraryName() throws Exception {
-        return invokeEntry("libraryName");
-    }
-
-    public static String runJvmSelfTests() throws Exception {
-        return invokeEntry("runJvmSelfTests");
-    }
-
-    public static String runLoginSelfTests() throws Exception {
-        return invokeEntry("runLoginSelfTests");
-    }
-
-    public static String componentLibraryName() throws Exception {
-        PluginClassLoader current = componentClassLoader;
-        if (current == null) {
-            throw new ClassNotFoundException("Component showcase DEX payload is not installed");
-        }
-        return invokeString(current.loadClass(COMPONENT_ENTRY_CLASS), "libraryName");
-    }
-
     public static String installationSummary() {
         PluginClassLoader layout = layoutClassLoader;
         File layoutPayload = installedLayoutPayload;
@@ -194,12 +161,79 @@ public final class DynamicLibraryLoader {
                 + "\nlayout.sha256=" + installedLayoutDigest
                 + "\ncomponent.loader=" + component.getClass().getName()
                 + "\ncomponent.payload=" + componentPayload.getAbsolutePath()
-                + "\ncomponent.sha256=" + installedComponentDigest;
+                + "\ncomponent.sha256=" + installedComponentDigest
+                + "\n" + resourceResolutionSummary;
     }
 
-    private static String invokeEntry(String methodName) throws Exception {
-        Class<?> entry = requireLayoutClassLoader().loadClass(LAYOUT_ENTRY_CLASS);
-        return invokeString(entry, methodName);
+    private static String verifyPluginFirstResources(
+            Context context, X2cResources resources) {
+        int hostStringId = context.getResources().getIdentifier(
+                "x2c_host_only_string", "string", context.getPackageName());
+        int hostHeroId = context.getResources().getIdentifier(
+                "hero", "drawable", context.getPackageName());
+        if (hostStringId == 0 || hostHeroId == 0) {
+            throw new IllegalStateException("Host resource fallback fixture was stripped");
+        }
+        if (!"X2C JAR Fixture".equals(resources.getString("library_name"))) {
+            throw new IllegalStateException("A host string overrode a plugin-declared string");
+        }
+        if (!"Host fallback active".equals(resources.getString("x2c_host_only_string"))
+                || !"Host fallback active".contentEquals(
+                        resources.getText("x2c_host_only_string"))
+                || resources.getIdentifier("x2c_host_only_string", "string") != hostStringId
+                || !resources.hasResource("x2c_host_only_string", "string")
+                || resources.getColor("x2c_host_only_color") != 0xFF246BFD
+                || resources.getColorStateList("x2c_host_only_color").getDefaultColor()
+                        != 0xFF246BFD
+                || !resources.getBoolean("x2c_host_only_bool")
+                || resources.getInteger("x2c_host_only_integer") != 37
+                || resources.getDimension(context, "x2c_host_only_dimen") <= 0f
+                || resources.getFraction("x2c_host_only_fraction", 100f, 200f) != 25f
+                || resources.getStringArray("x2c_host_only_strings").length != 2
+                || resources.getTextArray("x2c_host_only_strings").length != 2
+                || resources.getIntArray("x2c_host_only_integers").length != 2) {
+            throw new IllegalStateException("Host-only value resource fallback is incomplete");
+        }
+        Drawable hostDrawable = resources.getDrawable(context, "x2c_host_only_drawable");
+        Drawable hostSun = resources.getDrawable(context, "host_portrait_sun");
+        Drawable hostForest = resources.getDrawable(context, "host_portrait_forest");
+        if (hostDrawable == null
+                || hostSun == null
+                || hostForest == null
+                || resources.findIdentifier("x2c_host_only_id", "id") != 0
+                || resources.findIdentifier("x2c_host_only_layout", "layout") != 0) {
+            throw new IllegalStateException("Drawable fallback or synthetic id/layout isolation failed");
+        }
+        ImageAsset pluginNight = resources.image("plugin_portrait_night");
+        ImageAsset pluginBlue = resources.image("plugin_portrait_blue");
+        if (!"49e8f5832a38616fc97b6eaa0fdc95767efe8b37cfc6b1764390beae3259fc13"
+                        .equals(pluginNight.sha256)
+                || pluginNight.bytes != 44498L
+                || !"d18e50884dc66e02abb5e40010d25dc7866e6c5086cf1f92ed3e621d3ec8c1fa"
+                        .equals(pluginBlue.sha256)
+                || pluginBlue.bytes != 27727L) {
+            throw new IllegalStateException("Plugin CDN gallery metadata does not match its lock");
+        }
+        int pluginHeroId = resources.getIdentifier("hero", "drawable");
+        if (pluginHeroId == hostHeroId) {
+            throw new IllegalStateException("Plugin CDN bitmap leaked the host drawable ID");
+        }
+        try {
+            resources.getDrawable(context, "hero");
+            throw new IllegalStateException("Host drawable overrode a plugin-owned CDN bitmap");
+        } catch (IllegalArgumentException expected) {
+            // Plugin bitmaps are loaded asynchronously through X2cImages, never as host Drawable.
+        }
+        if (resources.findIdentifier("x2c_missing_resource", "string") != 0) {
+            throw new IllegalStateException("A missing plugin/host resource resolved unexpectedly");
+        }
+        try {
+            resources.getString("x2c_missing_resource");
+            throw new IllegalStateException("A missing plugin/host resource did not fail explicitly");
+        } catch (android.content.res.Resources.NotFoundException expected) {
+            // Missing values fail explicitly after both namespaces have been checked.
+        }
+        return "resources=plugin-first PASS · 3 plugin CDN + 2 host JPG / id isolation";
     }
 
     private static String invokeString(Class<?> owner, String methodName) throws Exception {
@@ -220,6 +254,9 @@ public final class DynamicLibraryLoader {
 
     private static void verifySharedRuntime(PluginClassLoader candidate)
             throws ClassNotFoundException {
+        if (X2C.isPlugin(candidate.loadClass(DynamicLibraryLoader.class.getName()))) {
+            throw new AssertionError("A host class resolved through a plugin was misidentified as plugin code");
+        }
         if (candidate.loadClass(X2C.class.getName()) != X2C.class
                 || candidate.loadClass(X2cResources.class.getName()) != X2cResources.class
                 || candidate.loadClass(X2cResourceProvider.class.getName()) != X2cResourceProvider.class

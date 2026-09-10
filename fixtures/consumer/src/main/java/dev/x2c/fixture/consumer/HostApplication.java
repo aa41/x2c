@@ -1,7 +1,6 @@
 package dev.x2c.fixture.consumer;
 
 import android.app.Application;
-import android.content.Context;
 import android.util.Log;
 import dev.x2c.runtime.X2C;
 import dev.x2c.runtime.X2cImages;
@@ -12,12 +11,12 @@ public final class HostApplication extends Application {
     private static volatile Throwable pluginFailure;
 
     @Override
-    protected void attachBaseContext(Context base) {
-        super.attachBaseContext(base);
+    public void onCreate() {
+        super.onCreate();
         try {
-            X2C.init(base);
+            X2C.init(this);
             X2cImages.setLoader(new VerifiedHttpImageLoader());
-            DynamicLibraryLoader.install(base);
+            DynamicLibraryLoader.install(this);
         } catch (Throwable error) {
             pluginFailure = error;
             Log.e(TAG, "Dynamic plugin installation failed", error);

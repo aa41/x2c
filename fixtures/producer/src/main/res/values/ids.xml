@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <item type="id" name="probe_runtime_state"/>
     <item type="id" name="declared_anchor" />
 </resources>

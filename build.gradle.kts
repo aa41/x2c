@@ -13,6 +13,5 @@ tasks.register("verifyX2c") {
         ":fixtures:business-base:assembleRelease",
         ":fixtures:consumer:assembleRelease",
         ":fixtures:normal-library:assembleRelease",
-        ":fixtures:normal-app:assembleRelease",
     )
 }

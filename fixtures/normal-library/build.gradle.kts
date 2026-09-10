@@ -26,9 +26,19 @@ android {
     }
 }
 
-x2c {
-    // Integration mode keeps Android resources in the AAR and binds R2 to the final host IDs.
-    pluginMode.set(false)
-    generatedPackage.set("dev.x2c.fixture.normal.generated")
-    minApi.set(21)
+// Intentionally no x2c block: code generation is opt-in. This AAR keeps its XML/resources and
+// exercises the runtime SystemX2cResourceProvider fallback.
+// An isolated demo switch avoids disabling the two dynamic plugins in the same APK.
+val normalDemoGeneration = providers.gradleProperty("x2c.normal.enable")
+if (normalDemoGeneration.isPresent) {
+    x2c {
+        pluginMode.set(false)
+        x2cEnable.set(normalDemoGeneration.map { value ->
+            when (value) {
+                "true" -> true
+                "false" -> false
+                else -> error("x2c.normal.enable must be true or false")
+            }
+        })
+    }
 }

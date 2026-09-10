@@ -74,11 +74,10 @@ X2C 的核心目标不是复刻完整 Android resource table，而是在一个�
 | Module | 用途 |
 |---|---|
 | `fixtures/business-base` | 同一业务 BaseActivity 在宿主保持 `Activity` 根、在插件复制后转换为 `PluginActivity`；analytics 验证宿主 fallback |
-| `fixtures/producer` | 完整 layout/resources/image/JVM 语义示例，也支持 plugin/normal 双模式构建 |
+| `fixtures/producer` | 完整 layout/resources/image 示例，也支持 plugin/normal 双模式构建 |
 | `fixtures/producer-secondary` | 四种 Activity launchMode 与 Service/Receiver/Provider 示例 |
 | `fixtures/consumer` | 两个独立 PluginClassLoader、签名安装、组件路由与跨插件测试宿主 |
 | `fixtures/normal-library` | 标准 AAR 基线 |
-| `fixtures/normal-app` | normal library 原生 Manifest/Resources/Activity 集成验证 |
 
 ## 4. 双模式构建
 
@@ -212,10 +211,21 @@ TextView title = resources.requireView(root, "title", TextView.class);
 
 | 模式 | R2 语义 | 约束 |
 |---|---|---|
-| plugin | `public static final int` synthetic ID | 与宿主 resource table 无关；不能传给宿主 `Resources.getString/getDrawable` |
+| plugin | `public static final int` synthetic ID；View ID 为 `0x70xxxxxx` | 可用于 View ID、keyed tag 和布局关系；与宿主 resource table 无关，不能传给宿主 `Resources` |
 | normal | `R2.<type>.<name>(context)` 无状态查询 facade | Provider 按名称解析真实宿主 ID 并缓存；不能用于 `switch case`/annotation |
 
 项目不再生成重复的 `X2cIds`，也没有 `R2.init()`。模块 Provider 是 normal ID 解析的唯一入口。
+
+plugin generated module 会额外创建宿主 runtime 所有的 plugin-first wrapper。wrapper 先通过 generated
+Provider 的白名单判断资源是否由插件声明：命中即读取插件 generated class/CDN，未命中的受支持 value/
+drawable 才查询宿主 `Resources`。宿主 `getIdentifier` 的成功与失败结果会缓存，值本身不缓存，因而仍会
+响应 locale、night mode、density 等配置变化。插件 `id/layout` 只允许 synthetic R2，不回退宿主；已声明
+资源的 identifier 也保持 synthetic，只有插件未声明的受支持宿主资源返回真实宿主 ID。动态 feature 安装后
+可调用 `X2C.invalidatePluginResourceCaches()` 清除名称查询缓存。
+
+宿主兜底当前只接受插件业务经 `X2cResources` 发起的显式名称查询。插件 XML 与 generated drawable 的资源
+依赖仍由编译器闭包校验，必须在插件内声明；这样未知引用和拼写错误继续在构建期失败，不会隐式绑定到某个
+宿主版本。未来若允许 XML 引用宿主资源，应增加显式语法/contract，而不是放宽现有未知引用检查。
 
 ### 5.4 多 layout 与 inflate
 
@@ -284,7 +294,7 @@ framework 静态 child 容器包括：
 - composition：selector、layer-list、inset、clip、scale、rotate、level-list；
 - drawable 引用执行未知引用、循环依赖和异步 bitmap 混用检查。
 
-当前 plugin 模式明确拒绝 qualifier、style/theme/styleable、vector、ripple、nine-patch、animated drawable、include/merge、Data/View Binding、资源 overlay 和动态资源名。
+当前 plugin 模式明确拒绝 qualifier、style/theme/styleable、vector、ripple、nine-patch、animated drawable、include/merge、Data/View Binding 和 AAPT2 overlay。插件业务可通过 `X2cResources` 按名称查询插件资源，或在插件未声明同名资源时查询受支持的宿主 value/drawable；这不等价于完整 Android resource overlay。
 
 ### 5.8 图片模型
 
@@ -295,10 +305,12 @@ plugin 模式：
   → 独立上传流程
   → 不可变 asset lock（HTTPS URL / MIME / bytes / SHA-256 / dimensions）
   → Java ImageAsset metadata
-  → 宿主 ImageLoader 异步加载
+  → 宿主 ImageLoader 异步加载 CDN
 ```
 
-Gradle 插件只消费 lock，不读取上传凭据、不主动访问网络。最终 JAR 不含图片原文件。
+Gradle 插件只消费 lock，不读取上传凭据、不主动访问网络。最终 JAR 不含图片原文件。插件声明的 bitmap
+始终优先并使用 CDN，不允许被宿主同名 drawable 静默替换；插件未声明的宿主 drawable 可通过
+`X2cResources.getDrawable(context, name)` 同步读取。
 
 normal 模式保留 bitmap，由宿主 `Resources` 同步解析为 Drawable。双模式自定义 View 可以为同名 setter 分别提供 `ImageAsset` 和 `Drawable` overload。
 
@@ -310,10 +322,10 @@ normal 模式保留 bitmap，由宿主 `Resources` 同步解析为 Drawable。�
 
 ### 6.1 进程初始化
 
-宿主在 `Application.attachBaseContext` 调用一次：
+宿主在真实 `Application.onCreate` 或加固 SDK 确认环境准备完成后调用一次：
 
 ```java
-X2C.init(baseContext);
+X2C.init(this);
 ```
 
 `X2C` 保存 application Context、宿主 package name 和宿主 ClassLoader，并通过 volatile 快路径与同步锁保证只发布一次。loader、generated module、组件或资源访问只调用 `requireInitialized`，不会重复绑定 Context。
@@ -592,7 +604,9 @@ DEX JAR
 - ClassLoader/anchor 缓存使用弱引用，避免长期持有无效 loader；
 - installer 使用单一进程锁串行化版本与文件事务；
 - 组件安装要求主线程；
-- 图片加载通过宿主异步 ImageLoader SPI，并负责取消、重绑和回调。
+- 图片加载通过宿主异步 ImageLoader SPI，并负责取消、重绑和回调。跨动态 DEX 的部分回调继承宿主
+  `ImageLoadAdapter`；listener contract 不依赖 Java 8 interface default method，避免宿主与插件独立 desugar
+  后出现缺失方法桥。
 
 当前未完成的进程恢复是指：系统在插件 Activity 位于最近任务栈时杀死宿主进程，之后直接恢复宿主占坑 Activity。此时内存中的 ClassLoader、plugin registry 和 route 已丢失。
 
@@ -671,12 +685,11 @@ bash ./scripts/verify-plugin-showcases.sh
 
 当前自动化覆盖：
 
-- 36 项 resource compiler self-test；
+- 38 项 resource compiler self-test；
 - synthetic R2、normal host ID、多个 layout；
 - View/ViewGroup/LayoutParams/custom view contract；
 - values/color/shape/selector/composite drawable；
 - bitmap lock、CDN metadata 和 normal local drawable；
-- JVM 内部类、lambda、泛型、record、异常、同步和逻辑运算；
 - Activity 基类转换、compileOnly 最小闭包、host fallback；
 - 组件 direct registry、slot 上限和不安全 API 拒绝；
 - descriptor 签名 canonical bytes、loader 和 runtime core；
@@ -733,3 +746,8 @@ bash ./scripts/verify-plugin-showcases.sh
 - [pluginMode 安全切换指南](PLUGIN_MODE.md)
 - [Fixture 使用与验证](../fixtures/README.md)
 - [项目入口](../README.md)
+# XML2Java 关闭路径
+
+`x2cEnable=false` 或未配置 X2C 时，普通 AAR 保留资源，生成任务只清理旧源码并写 `SYSTEM_RESOURCES` 报告。业务通过宿主 runtime 的 `SystemX2cResourceProvider` 按资源名称查询 Android ID；Activity 的字符串布局 API 交给原生 `LayoutInflater` / `Activity.setContentView`。此路径不需要生成 R2、X2cModule、X2cLayouts、ProviderImpl 或 bootstrap。
+
+有生成模块时仍通过 anchor 对应 ClassLoader 查找 bootstrap；只有宿主 ClassLoader 内缺失 bootstrap 才允许系统 fallback，独立插件缺失 bootstrap 会报错。系统资源句柄持有请求 Context，应遵循该 Context 的生命周期，避免跨 Activity 静态缓存。

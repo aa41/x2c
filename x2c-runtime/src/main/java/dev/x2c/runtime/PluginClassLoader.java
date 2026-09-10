@@ -19,6 +19,7 @@ public final class PluginClassLoader extends DexClassLoader {
         if (hostClassLoader == null) {
             throw new NullPointerException("hostClassLoader");
         }
+        X2C.registerPluginClassLoader(this);
     }
 
     @Override

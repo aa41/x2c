@@ -3,14 +3,15 @@ set -euo pipefail
 
 task_root=$(cd "$(dirname "$0")/.." && pwd)
 task_mode=${X2C_BUILD_MODE:-plugin}
+task_x2c_enabled=${X2C_ENABLE:-true}
 task_module=${X2C_MODULE:-:fixtures:producer}
 task_variant=${X2C_VARIANT:-release}
 task_extra_gradle_args=()
 
 usage() {
-    echo "Usage: $0 [--mode plugin|normal] [--module :path] [--variant name] [-- GRADLE_ARGS...]"
+    echo "Usage: $0 [--mode plugin|normal] [--x2c-enable true|false] [--module :path] [--variant name] [-- GRADLE_ARGS...]"
     echo
-    echo "Environment alternatives: X2C_BUILD_MODE, X2C_MODULE, X2C_VARIANT"
+    echo "Environment alternatives: X2C_BUILD_MODE, X2C_ENABLE, X2C_MODULE, X2C_VARIANT"
     echo "plugin -> Android-loadable codegen-dex.jar; normal -> standard Android AAR"
 }
 
@@ -19,6 +20,11 @@ while [[ $# -gt 0 ]]; do
         --mode)
             [[ $# -ge 2 ]] || { echo "--mode requires a value" >&2; exit 2; }
             task_mode=$2
+            shift 2
+            ;;
+        --x2c-enable|--x2c-enabled)
+            [[ $# -ge 2 ]] || { echo "$1 requires a value" >&2; exit 2; }
+            task_x2c_enabled=$2
             shift 2
             ;;
         --module)
@@ -57,6 +63,15 @@ case "$task_mode" in
         ;;
 esac
 
+case "$task_x2c_enabled" in
+    true|false) ;;
+    *) echo "--x2c-enable must be true or false" >&2; exit 2 ;;
+esac
+if [[ "$task_mode" == plugin && "$task_x2c_enabled" == false ]]; then
+    echo "Plugin JAR requires --x2c-enable true; use --mode normal for system resources" >&2
+    exit 2
+fi
+
 if [[ ! "$task_module" =~ ^(:[A-Za-z0-9_.-]+)+$ ]]; then
     echo "Invalid Gradle module path: $task_module" >&2
     exit 2
@@ -66,8 +81,8 @@ if [[ ! "$task_variant" =~ ^[A-Za-z][A-Za-z0-9]*$ ]]; then
     exit 2
 fi
 for task_arg in "${task_extra_gradle_args[@]}"; do
-    if [[ "$task_arg" == -Px2c.pluginMode=* ]]; then
-        echo "Do not pass x2c.pluginMode twice; use --mode plugin|normal" >&2
+    if [[ "$task_arg" == -Px2c.pluginMode=* || "$task_arg" == -Px2c.enable=* ]]; then
+        echo "Use --mode and --x2c-enable instead of duplicate Gradle properties" >&2
         exit 2
     fi
 done
@@ -94,6 +109,7 @@ echo "X2C build: mode=$task_mode module=$task_module variant=$task_variant"
 "$task_root/gradlew" -p "$task_root" \
     "$task_gradle_task" \
     "-Px2c.pluginMode=$task_plugin_mode" \
+    "-Px2c.enable=$task_x2c_enabled" \
     "${task_extra_gradle_args[@]}"
 
 task_report="$task_module_directory/build/reports/x2c/$task_variant/report.json"
@@ -141,8 +157,10 @@ else
         echo "Invalid normal Android library artifact: $task_artifact" >&2
         exit 1
     fi
-    if ! grep -q '"mode": "HOST_RESOURCE_IDS"' "$task_report"; then
-        echo "Normal report does not declare HOST_RESOURCE_IDS" >&2
+    task_expected_mode=HOST_RESOURCE_IDS
+    [[ "$task_x2c_enabled" == true ]] || task_expected_mode=SYSTEM_RESOURCES
+    if ! grep -q "\"mode\": \"$task_expected_mode\"" "$task_report"; then
+        echo "Normal report does not declare $task_expected_mode" >&2
         exit 1
     fi
 fi

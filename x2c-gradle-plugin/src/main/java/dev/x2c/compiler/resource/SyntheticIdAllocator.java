@@ -10,6 +10,11 @@ import java.util.TreeMap;
 
 /** Stable synthetic-ID allocation independent of Android's generated R class. */
 final class SyntheticIdAllocator {
+    // Android's keyed View#setTag(int, Object) rejects keys whose package byte is 0x00 or 0x01.
+    // Keep plugin View IDs outside the host's usual 0x7F and framework's 0x01 namespaces while
+    // retaining a 24-bit deterministic hash for independently generated class-only modules.
+    private static final int VIEW_ID_PREFIX = 0x70000000;
+
     private SyntheticIdAllocator() {}
 
     static void assignSyntheticIds(String generatedPackage, Model model) {
@@ -23,7 +28,7 @@ final class SyntheticIdAllocator {
     }
 
     private static int prefix(String type) {
-        if (type.equals("id")) return 0;
+        if (type.equals("id")) return VIEW_ID_PREFIX;
         if (type.equals("layout")) return 0x7E000000;
         if (type.equals("string")) return 0x71000000;
         if (type.equals("color")) return 0x72000000;
@@ -62,9 +67,6 @@ final class SyntheticIdAllocator {
             byte[] bytes = digest.digest((generatedPackage + ":" + type + ":" + name)
                     .getBytes(StandardCharsets.UTF_8));
             int hash = ((bytes[0] & 0xff) << 16) | ((bytes[1] & 0xff) << 8) | (bytes[2] & 0xff);
-            if (prefix == 0) {
-                return hash == 0 ? 1 : hash;
-            }
             return prefix | hash;
         } catch (NoSuchAlgorithmException impossible) {
             throw new AssertionError(impossible);

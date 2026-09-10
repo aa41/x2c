@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <RadioGroup android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="RadioGroup XML 构造示例" android:tag="RadioGroup" android:orientation="vertical" android:checkedButton="@id/probe_child_secondary">
+        <RadioButton android:id="@+id/probe_child" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="系统 Resources"/>
+        <RadioButton android:id="@+id/probe_child_secondary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="X2C 生成代码"/>
+    </RadioGroup>
+</LinearLayout>

@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="secondary_library_name">Component Showcase Plugin</string>
-    <string name="secondary_status">四大组件插件已完成独立注册</string>
 </resources>

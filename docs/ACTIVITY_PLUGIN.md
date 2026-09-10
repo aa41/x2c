@@ -98,8 +98,8 @@ BaseActivity。Shadow 的插件基类代码和生命周期可以执行，是因�
 Android/Java 平台包强制 parent-first，避免 singleton 与类型身份分裂；其余业务类 plugin-first，插件中
 不存在时自然回退宿主。因此宿主业务能力不需要额外注解，但如果同名类也被显式打进插件，则插件副本优先。
 
-宿主在 `Application.attachBaseContext` 中调用且只调用一次 `X2C.init(base)`；若不需要在该阶段安装插件，
-也可放到 `Application.onCreate`。插件安装器、generated `X2cModule`、Activity 和资源访问只验证宿主已经
+宿主在真实 `Application.onCreate` 或加固 SDK 确认环境就绪后调用 `X2C.init(this)`。
+组件 runtime ABI 2 的 Application 与代码身份契约见 [HOST_APPLICATION_CONTRACT](HOST_APPLICATION_CONTRACT.md)。插件安装器、generated `X2cModule`、Activity 和资源访问只验证宿主已经
 初始化，不再重复绑定 Context/ClassLoader。每个插件 module 的 Provider/Layout registry 在首次 load 时
 初始化一次，并缓存业务 anchor class 到 module 的映射；后续 `X2C.resources(Activity.class)` 不再执行
 bootstrap 反射。

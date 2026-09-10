@@ -1,34 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="library_name">X2C JAR Fixture</string>
-    <string name="brand_name">X2C Identity</string>
-    <string name="brand_caption">动态组件 · 安全登录</string>
-    <string name="jar_badge">DEX JAR</string>
-    <string name="login_title">欢迎回来</string>
-    <string name="login_subtitle">登录后继续访问你的动态工作空间</string>
-    <string name="email_label">邮箱地址</string>
-    <string name="email_hint">name@example.com</string>
-    <string name="email_description">邮箱输入框</string>
-    <string name="password_label">登录密码</string>
-    <string name="password_hint">请输入至少 6 位密码</string>
-    <string name="password_description">密码输入框</string>
-    <string name="show_password">显示</string>
-    <string name="remember_me">□ 记住我</string>
-    <string name="forgot_password">忘记密码？</string>
-    <string name="login_action">安全登录</string>
-    <string name="fill_demo">一键填入演示账号</string>
-    <string name="demo_account">演示账号  demo@x2c.dev  ·  x2c2026</string>
-    <string name="or_continue">或使用以下方式继续</string>
-    <string name="wechat_login">微信</string>
-    <string name="github_login">GitHub</string>
-    <string name="privacy_copy">继续即表示你同意《服务条款》和《隐私政策》</string>
-    <string name="runtime_chip">XML → Class  ·  DexClassLoader</string>
-    <string name="hero_description">CDN 品牌图片</string>
-    <string name="close_page">关闭登录页面</string>
-    <string name="headline">登录组件已编译为 Class</string>
     <string name="matrix_title">Framework View / ViewGroup 能力矩阵</string>
     <string name="matrix_subtitle">Frame · Relative · Grid · Table · Radio · Scroll</string>
     <string name="matrix_action">运行交互矩阵</string>
     <string name="matrix_result">等待交互测试</string>
-    <string name="matrix_counter">矩阵运行 %1$d 次</string>
 </resources>

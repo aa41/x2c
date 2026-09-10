@@ -1,5 +1,9 @@
 # X2C Plugin
 
+当前测试入口为一个 [三合一 Demo APK](docs/DEMO_SUITE.md)：全能力实验室、哔哩哔哩风格首页插件、普通 X2C API 工作台。构建任务：`:fixtures:consumer:assembleDebug`。
+
+Application 共享、宿主初始化和 ClassLoader 身份约定见 [宿主 Application 契约](docs/HOST_APPLICATION_CONTRACT.md)。当前组件 runtime ABI 为 2，旧载荷需重新构建。
+
 将受控 Android library 的一部分 XML/resources 编译为 Java class，并输出可独立消费的 JAR。
 
 当前实现是一个可运行的 strict MVP，而不是对任意 Android 资源系统的无损替代。插件模式遇到未知资源、qualifier、Manifest 组件或未锁定的图片时会失败；普通 AAR 模式会保留并正常合并 Library Manifest。
@@ -156,7 +160,7 @@ BaseActivity 仍不能作为插件父类；平台和 X2C runtime/API/base/loader
 
 | 配置 | R2 形态 | 资源边界 | 适用场景 |
 |---|---|---|---|
-| `pluginMode=true`（默认） | 编译期 `public static final int` synthetic ID | JAR/DEX JAR 不依赖宿主 resource table | 动态插件、纯 class payload |
+| `pluginMode=true`（默认） | 编译期 `public static final int` synthetic ID；View ID 使用 `0x70xxxxxx` | 插件声明资源优先；插件未声明的受支持 value/drawable 可回退宿主 | 动态插件、纯 class payload |
 | `pluginMode=false` | 无状态查询方法，例如 `R2.id.title(context)`；内部委托模块 Provider | 原始资源必须正常合并进宿主 | 普通 Android library 集成 |
 
 完整的命令行切换、依赖/Manifest 检查表和回归命令见
@@ -176,6 +180,24 @@ normal ID 仍不是 Java compile-time constant，不能用于 `switch case` 或 
 `Resources.NotFoundException`。R2 查询只在首次访问时进入模块初始化锁；初始化完成后通过 volatile 快路径
 直接访问 Provider，已缓存的资源 ID 查询同样不再加锁。
 
+plugin 模式的 `R2.id` 使用专用 `0x70xxxxxx` 空间：可用于 `View#setId`、`findViewById`、
+`View#setTag(int, Object)` 和依赖 View ID 的 LayoutParams 关系；24 位稳定 hash 包含 generated package，
+模块内碰撞会在构建期失败。它没有 `resources.arsc` 条目，不能传给宿主 `Resources#getResourceName`，
+也不能代替 string/drawable 等资源的 `X2cResources` 查询。
+
+plugin 模式的 generated module 会在宿主 runtime 中安装轻量 plugin-first Provider。string/color/bool/
+integer/dimen/fraction/array/drawable 若已由插件声明，始终使用插件 generated class/CDN；仅当插件未声明时，
+才调用 `Resources.getIdentifier(name, type, context.getPackageName())` 读取宿主资源。typed `Object[]` 与基于
+语法类别的 plurals 无法无损映射 Android API，继续保持插件专属。`id`、`layout` 始终使用插件 synthetic ID，
+即使宿主存在同名资源也不会回退。`getIdentifier()`/`findIdentifier()` 对插件已声明资源返回 synthetic ID，
+对插件未声明的受支持 value/drawable 返回宿主真实 ID。`pluginMode=false` 不创建这层 Provider，继续完全使用
+标准 AAR/Resources 流程。宿主中只被动态名称访问的资源可能被 resource shrinker 删除，应通过宿主静态引用
+或 `tools:keep` 保留。
+
+当前宿主兜底是显式 runtime API：插件业务使用 `X2cResources.getString/getDrawable/...` 请求宿主独有名称。
+插件 XML 和 generated drawable 中的 `@type/name` 仍必须在插件资源模型内声明，未知引用会在构建期失败，避免
+把拼写错误静默解释成随宿主版本变化的资源依赖。
+
 Gradle 插件会在 Android namespace 下生成 `x2c.X2cModuleBootstrap`。宿主已经加载插件入口类后，
 runtime 会沿入口类包路径找到 bootstrap、初始化内部 `X2cModule` 并返回不暴露模块名称的句柄：
 
@@ -191,13 +213,14 @@ bootstrap 必须和业务 anchor 来自同一个 ClassLoader，避免 plugin loa
 任意 library 业务类即可从应用 ClassLoader 按需初始化对应 module：
 
 ```java
-@Override protected void attachBaseContext(Context base) {
-    super.attachBaseContext(base);
-    X2C.init(base);
+@Override public void onCreate() {
+    super.onCreate();
+    X2C.init(this);
 }
 ```
 
-如果插件不在 `attachBaseContext` 安装，也可以放在 `Application.onCreate`；关键是必须早于第一次 X2C
+在真实 Application/加固环境准备完成后初始化；可显式传入 `X2C.init(application, stableHostLoader)`。
+普通 baseContext 尚未关联真实 Application 时会明确报错。初始化必须早于第一次 X2C
 资源访问或插件 ClassLoader 创建。loader、generated bootstrap、Activity 和每次资源查询都不再重复调用
 `X2C.init`。每个 generated module 仍会在首次装载时注册一次自己的 Provider/Layout，这与进程级初始化
 是两个不同生命周期。
@@ -324,7 +347,9 @@ int accent = x2c.color("accent");
 normal R2 只保留无状态兼容查询门面。此前重复的 generated `X2C` 门面和 `X2cIds` 均已移除。
 
 `X2cResourceProviderImpl` 仍然必要：它保存当前模块的资源名称白名单，以及“名称 → 编译后 Java
-value/drawable”分发表。plugin 模式的 `getIdentifier()` 返回 generated `R2` synthetic ID；normal 模式先用
+value/drawable”分发表。plugin 模式由宿主 runtime 的 plugin-first wrapper 先查询该白名单：命中即委托
+插件分发表，未命中的受支持 value/drawable 才查询宿主；插件声明资源的 `getIdentifier()` 返回 generated
+`R2` synthetic ID。normal 模式不创建 wrapper，而是先用
 生成白名单阻止越权查询，再按资源名称首次访问时调用宿主
 `context.getResources().getIdentifier(name, type, context.getPackageName())`，结果缓存在模块 Provider 中，
 返回 0 时抛 `Resources.NotFoundException`。`R2.init()` 已删除，生成布局、normal R2 兼容方法和业务
@@ -419,6 +444,12 @@ setter/field 类型包括 `STRING`、`COLOR`、`DIMENSION` (float px)、`DIMENSI
 生成器验证 HTTPS、名称全集、SHA-256、MIME 和字节数。宿主通过
 `dev.x2c.runtime.X2cImages.setLoader(ImageLoader)` 安装唯一图片加载器，插件使用
 `X2cResources.loadImage`；callback-aware overload 接收 `ImageLoadListener`，可观察 start/success/failure/cancel。
+插件只关心部分回调时应继承 `ImageLoadAdapter`。`ImageLoadListener` 不使用 Java 8 interface default method，
+因为宿主 APK 与后发插件 DEX 会独立执行 desugar；Adapter 的宿主实现可避免遗漏回调在动态边界触发
+`AbstractMethodError`。
+plugin bitmap 属于插件已声明资源，始终按 lock 中的 CDN metadata 异步加载；宿主同名 drawable 不会覆盖它。
+插件若要使用仅由宿主提供的本地 drawable，应使用 `X2cResources.getDrawable(context, name)` 同步读取，且该
+名称不能同时由插件声明为 bitmap。
 fixture 的无依赖 HTTP loader 会验证最终 HTTPS、HTTP/MIME、精确字节数、SHA-256、解码尺寸上限，支持取消、
 同一 View 重绑和基于内容摘要的内存缓存。生产仍可替换为执行同等门禁的 Coil/Glide adapter。
 
@@ -458,4 +489,20 @@ X2C_OFFLINE=true ./scripts/verify-agp-compatibility.sh
 ./scripts/verify-plugin-showcases.sh
 ```
 
-fixture 的对外能力展厅与交互矩阵验证真实 values/layout/custom ViewGroup/shape/selector/JPEG lock、JVM 内部类与逻辑代码经由插件生成 class-only JAR 和 DEX JAR；consumer 不静态依赖 producer class，而是把两个 DEX JAR 作为独立动态 payload 加载，并验证宿主→插件、同插件、跨插件、Result、singleTop/onNewIntent、插件→宿主以及 BaseActivity 构造/attach/lifecycle `super` 链。normal fixture 同时验证同一 JPEG 作为 AAR 本地 drawable。当前实测结果与边界见 [docs/FEASIBILITY.md](docs/FEASIBILITY.md)。
+fixture 的对外能力展厅与交互矩阵验证真实 values/layout/custom ViewGroup/shape/selector/JPEG lock 经由插件生成 class-only JAR 和 DEX JAR；图片矩阵覆盖三张插件 CDN 图片与两张宿主本地 JPG，并验证插件声明优先、宿主独有 drawable 兜底。consumer 不静态依赖 producer class，而是把两个 DEX JAR 作为独立动态 payload 加载，并验证宿主→插件、同插件、跨插件、Result、singleTop/onNewIntent、插件→宿主以及 BaseActivity 构造/attach/lifecycle `super` 链。normal fixture 同时验证插件源 JPEG 作为 AAR 本地 drawable。当前实测结果与边界见 [docs/FEASIBILITY.md](docs/FEASIBILITY.md)。
+# XML2Java 开关
+
+`x2cEnable`（也支持小写 `x2cenable`）控制是否生成 Java。配置了 X2C 模块参数而省略此开关时默认开启；没有任何 X2C 配置（包括空 `x2c {}`）时使用系统资源。
+
+```kotlin
+x2c {
+    pluginMode.set(false) // 普通 AAR
+    x2cEnable.set(false)  // true：原有 XML2Java；false：系统 Resources/LayoutInflater
+}
+```
+
+关闭时不生成 R2、X2cModule、X2cLayouts 或 bootstrap；切换时自动清除该 variant 的旧生成源码。业务继续调用 `X2C.resources(this, MyActivity.class)` 和 `X2C.setContentView(this, "layout_name")`。系统路径保留 Activity 主题、原生 XML inflate 与 `<merge>` 行为，通过 `Resources.getIdentifier` 查找真实资源 ID。资源 shrink 开启时，须为按名称访问的资源配置 Android `tools:keep`。
+
+CLI：`./scripts/build-x2c-artifact.sh --mode normal --x2c-enable false`，或 Gradle `-Px2c.pluginMode=false -Px2c.enable=false`。显式 DSL 设置优先于插件的 CLI 默认值；示例 producer 已接入 CLI Provider，支持直接切换。
+
+资源为空的动态插件 JAR 必须保持 `pluginMode=true, x2cEnable=true`；`true/false` 组合会明确构建失败。未找到 bootstrap 的动态插件也会报错，不能被误识别为普通宿主模块。系统资源句柄应按 Activity 生命周期持有，以保留主题与配置。现有 `X2cQuantity` 表示语法类别，无法转换为 Android 的整数数量；系统模式的 plurals 请使用 Android `Resources.getQuantityString`。

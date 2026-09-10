@@ -52,6 +52,7 @@ public final class ComponentShowcaseActivity extends BusinessBaseActivity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        ComponentState.verifyHostApplication(this, ComponentShowcaseActivity.class);
         resources = X2C.resources(ComponentShowcaseActivity.class);
         getWindow().setStatusBarColor(resources.color("secondary_dark"));
         getWindow().setNavigationBarColor(resources.color("secondary_surface"));
@@ -149,6 +150,10 @@ public final class ComponentShowcaseActivity extends BusinessBaseActivity {
             sendBroadcast(new Intent(this, ComponentProbeReceiver.class)
                     .setAction("dev.x2c.fixture.component.NORMAL"));
             receiverStatus.postDelayed(this::renderComponentStates, 100L);
+            // The routed manifest Receiver may not reach its goAsync continuation before the
+            // first UI refresh on a cold plugin ClassLoader. Refresh again so the demo reports
+            // the state written immediately before PendingResult.finish(), not a stale snapshot.
+            receiverStatus.postDelayed(this::renderComponentStates, 600L);
         });
         required(root, "receiver_ordered").setOnClickListener(ignored -> {
             ComponentState.receiver = "Receiver: dispatching ordered broadcast";

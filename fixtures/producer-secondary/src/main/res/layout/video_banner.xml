@@ -1,0 +1,10 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="226dp" android:background="@drawable/video_card_surface">
+    <ImageView android:id="@+id/video_banner_image" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitStart"/>
+    <TextView android:id="@+id/video_banner_caption" android:layout_width="match_parent" android:layout_height="36dp"
+        android:layout_gravity="bottom" android:gravity="center_vertical" android:paddingLeft="8dp" android:paddingRight="40dp"
+        android:background="@drawable/video_metrics_scrim" android:text="我来英都，就是为了找到超能力者。"
+        android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
+    <LinearLayout android:id="@+id/video_banner_dots" android:layout_width="38dp" android:layout_height="26dp"
+        android:layout_gravity="bottom|right" android:gravity="center"/>
+</FrameLayout>

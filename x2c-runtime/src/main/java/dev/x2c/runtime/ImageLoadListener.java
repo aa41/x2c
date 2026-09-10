@@ -1,12 +1,12 @@
 package dev.x2c.runtime;
 
-/** Optional lifecycle callbacks for host-owned asynchronous image requests. */
+/** Lifecycle callbacks for host-owned asynchronous image requests. */
 public interface ImageLoadListener {
-    default void onStart(ImageAsset asset) {}
+    void onStart(ImageAsset asset);
 
-    default void onSuccess(ImageAsset asset) {}
+    void onSuccess(ImageAsset asset);
 
-    default void onFailure(ImageAsset asset, Throwable error) {}
+    void onFailure(ImageAsset asset, Throwable error);
 
-    default void onCancelled(ImageAsset asset) {}
+    void onCancelled(ImageAsset asset);
 }

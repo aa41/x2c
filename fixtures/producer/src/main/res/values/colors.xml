@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="page_background">#F3F6FC</color>
     <color name="surface">#FFFFFFFF</color>
     <color name="ink">#182033</color>
     <color name="muted">#667085</color>
-    <color name="subtle">#98A2B3</color>
     <color name="primary">#3157D5</color>
     <color name="primary_pressed">#2344B5</color>
     <color name="primary_disabled">#A8B7E8</color>
@@ -12,6 +10,8 @@
     <color name="border">#DDE3EE</color>
     <color name="error">#D92D20</color>
     <color name="success">#087A55</color>
+    <color name="success_soft">#DDF8EE</color>
+    <color name="warning_soft">#FFF2CC</color>
     <color name="panel">#F8F9FA</color>
     <color name="accent">#3157D5</color>
     <color name="violet">#7C3AED</color>

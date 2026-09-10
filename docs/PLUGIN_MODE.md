@@ -67,6 +67,14 @@ x2c {
 - `AndroidManifest.xml` 不声明插件 Activity、Service、Receiver 或 Provider。系统只认识 runtime AAR 预声明的非导出代理容器。
 - 每个同时加载的 JAR 必须使用唯一 `x2c.pluginId` 和唯一 `x2c.generatedPackage`。
 - 位图必须经过不可变 asset lock/CDN 流程；最终 `codegen.jar` 只能包含 class，DEX JAR 只能包含 `classes.dex`。
+- 仅 plugin 模式会启用 plugin-first Provider：string/color/bool/integer/dimen/fraction/array/drawable
+  已由插件声明时使用插件 generated class/CDN，插件未声明时才回退宿主 `Resources`。`id/layout` 永远
+  保持 synthetic ID，不回退宿主。插件 bitmap 始终走 CDN；宿主独有 drawable 通过
+  `X2cResources.getDrawable()` 同步获取。动态查询的宿主资源需由静态引用或 `tools:keep` 防止 shrink。
+- `R2.id` 使用 `0x70xxxxxx` 专用 View ID 空间，支持 `setId/findViewById`、keyed `setTag` 和布局
+  ID 关系；它不是 `resources.arsc` 条目，禁止传给宿主 `Resources` API。
+- 宿主兜底仅用于业务代码通过 `X2cResources` 显式查询的宿主独有名称；插件 XML/generated drawable 的引用
+  仍必须由插件声明，未知名称保持构建期失败。
 - 宿主只在 `Application` 初始化一次 `X2C.init(applicationContext)`，验签并创建 ClassLoader 后调用：
 
 ```java
@@ -93,6 +101,8 @@ unzip -l library/build/outputs/x2c/release/codegen-dex.jar
 - library 使用 `api` 或 `implementation` 依赖 `x2c-runtime`，由 application ClassLoader 正常加载。
 - Activity、Service、Receiver、Provider 由 Android framework 按 Manifest 原生创建，不执行插件组件 superclass transform。
 - `R2` 是无状态查询 facade，通过模块 Provider/宿主 `Resources` 解析最终资源 ID；没有 `R2.init()`。
+- 不安装 plugin-first wrapper，也不执行插件/宿主资源分派逻辑；资源行为完全由标准 AAR 合并后的
+  Android `Resources` 决定。
 - 不需要 asset lock，也不应运行 `x2c<Variant>Jar`/`x2c<Variant>DexJar`；两者都会明确失败，因为 normal class 不能脱离宿主 resource table。若误运行组件转换 task，也会报错 `Android component transformation requires x2c.pluginMode=true`。
 - 双模式 module 可以保留 `dev.x2c.activity-plugin`，normal 路径不会依赖或执行转换 task；此时 framework
   仍根据合并后的 Manifest 创建组件。直接误执行转换/JAR/DEX JAR task 会在执行期明确失败。
@@ -141,3 +151,10 @@ Gradle task 已把 `pluginMode` 声明为输入，正常切换不依赖手工删
 动态插件升级必须在新的应用进程中安装。当前 runtime 会拒绝重复 `pluginId` 和热卸载：系统仍可能持有
 Activity token、Service bind/start transition、广播 pending result 或 Provider 调用，局部删除 registry
 无法证明安全。生产更新流程应下载并验签新版本、记录待激活版本，然后在下次受控进程启动时安装。
+# XML2Java 可选开关
+
+普通 AAR 可配置 `x2c { pluginMode.set(false); x2cEnable.set(false) }`，保留原生资源并通过 runtime 的系统 Provider 按名称加载，不生成 Java。未配置任何 X2C 参数时行为相同；已配置模块时 `x2cEnable` 默认开启。空配置块不算启用配置，若需要仅启用默认设置，请写 `x2cEnable.set(true)`。
+
+构建命令：`./scripts/build-x2c-artifact.sh --mode normal --x2c-enable false`。Gradle 参数为 `-Px2c.pluginMode=false -Px2c.enable=false`。开关独立于构建模式，资源为空的插件 JAR 要求生成开启，非法组合会报错。切换无需 clean，生成任务会清理旧源码，回归脚本也检查 AAR 中没有残留生成 class。
+
+业务代码可统一使用 `X2C.setContentView(this, "content")` 与 `X2C.resources(this, MyActivity.class)`。普通系统路径以 Activity Context 保留主题，inflate 采用 Android 原生返回值和 `<merge>` 语义。本地图片使用 `resources.loadImage` 时直接读取 drawable，无需 CDN loader；其 ImageAsset 使用 `android.resource://`，hash/mime 为空、bytes 为 0。

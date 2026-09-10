@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <TwoLineListItem android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="TwoLineListItem XML 构造示例" android:tag="TwoLineListItem">
+        <TextView android:id="@+id/probe_child" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" android:textSize="18sp" android:text="主标题"/>
+        <TextView android:id="@+id/probe_child_secondary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_below="@id/probe_child" android:text="副标题来自第二个 XML 子 View"/>
+    </TwoLineListItem>
+</LinearLayout>

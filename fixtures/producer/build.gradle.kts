@@ -15,6 +15,17 @@ val x2cPluginBuild = providers.gradleProperty("x2c.pluginMode")
         }
     }
     .orElse(true)
+val x2cCodegenEnabled = providers.gradleProperty("x2c.enable")
+    .map { value ->
+        when (value.trim().lowercase()) {
+            "true" -> true
+            "false" -> false
+            else -> error(
+                "Gradle property x2c.enable must be exactly true or false, but was: $value",
+            )
+        }
+    }
+    .orElse(true)
 val isX2cPluginBuild = x2cPluginBuild.get()
 
 dependencies {
@@ -68,6 +79,7 @@ android {
 
 x2c {
     // One Provider controls generated IDs, dependency ownership, Manifest and artifact selection.
+    x2cEnable.set(x2cCodegenEnabled)
     pluginMode.set(x2cPluginBuild)
     pluginId.set("dev.x2c.fixture.layout-showcase")
     generatedPackage.set("dev.x2c.fixture.generated")

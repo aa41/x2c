@@ -13,6 +13,11 @@ buildscript {
 }
 
 def pluginPayloadMode = (findProperty('x2cPluginMode') ?: 'true').toBoolean()
+def x2cEnableValue = (findProperty('x2c.enable') ?: 'true').toString()
+if (!(x2cEnableValue in ['true', 'false'])) {
+    throw new GradleException('x2c.enable must be exactly true or false')
+}
+def x2cCodegenEnabled = x2cEnableValue.toBoolean()
 
 apply plugin: 'com.android.library'
 apply plugin: 'dev.x2c.codegen'
@@ -59,6 +64,7 @@ android {
 }
 
 x2c {
+    x2cEnable.set(x2cCodegenEnabled)
     pluginMode.set(pluginPayloadMode)
     if (pluginPayloadMode) {
         pluginId.set('dev.x2c.compatibility')

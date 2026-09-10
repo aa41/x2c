@@ -3,7 +3,6 @@ package dev.x2c.runtime;
 import android.app.Activity;
 import android.content.Context;
 import android.content.res.ColorStateList;
-import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,14 +13,29 @@ import java.util.Objects;
 public final class X2cResources {
     private final String moduleName;
     private final X2cResourceProvider provider;
+    private final boolean systemResources;
 
     X2cResources(String moduleName, X2cResourceProvider provider) {
+        this(moduleName, provider, false);
+    }
+
+    private X2cResources(
+            String moduleName, X2cResourceProvider provider, boolean systemResources) {
         this.moduleName = moduleName;
         this.provider = provider;
+        this.systemResources = systemResources;
+    }
+
+    static X2cResources system(String moduleName, X2cResourceProvider provider) {
+        return new X2cResources(moduleName, provider, true);
     }
 
     public String getModuleName() {
         return moduleName;
+    }
+
+    public boolean isSystemResources() {
+        return systemResources;
     }
 
     public int identifier(String type, String name) {
@@ -33,15 +47,11 @@ public final class X2cResources {
     }
 
     public int findIdentifier(String name, String type) {
-        try {
-            return provider.getIdentifier(type, name);
-        } catch (IllegalArgumentException | Resources.NotFoundException missing) {
-            return 0;
-        }
+        return provider.findIdentifier(type, name);
     }
 
     public boolean hasResource(String name, String type) {
-        return findIdentifier(name, type) != 0;
+        return provider.hasResource(type, name);
     }
 
     public int id(String name) {
@@ -57,7 +67,7 @@ public final class X2cResources {
     }
 
     public CharSequence getText(String name) {
-        return provider.getString(name);
+        return provider.getText(name);
     }
 
     public String getString(String name, Object... arguments) {
@@ -129,7 +139,7 @@ public final class X2cResources {
     }
 
     public CharSequence[] getTextArray(String name) {
-        return provider.getStringArray(name);
+        return provider.getTextArray(name);
     }
 
     public String[] getStringArray(String name) {
@@ -141,7 +151,7 @@ public final class X2cResources {
     }
 
     public int[] getIntArray(String name) {
-        return provider.getIntegerArray(name);
+        return provider.getIntArray(name);
     }
 
     public Object[] array(Context context, String name) {
@@ -157,12 +167,12 @@ public final class X2cResources {
     }
 
     public CharSequence getQuantityText(String name, X2cQuantity quantity) {
-        return provider.getPlural(name, quantity);
+        return provider.getQuantityText(name, quantity);
     }
 
     public String getQuantityString(
             String name, X2cQuantity quantity, Object... arguments) {
-        return provider.getPlural(name, quantity, arguments);
+        return provider.getQuantityString(name, quantity, arguments);
     }
 
     public Drawable drawable(Context context, String name) {
@@ -174,27 +184,53 @@ public final class X2cResources {
     }
 
     public ImageAsset image(String name) {
+        if (systemResources) {
+            return ((SystemX2cResourceProvider) provider).image(moduleName, name);
+        }
         return X2cImages.get(moduleName, name);
     }
 
     public void loadImage(ImageView target, String name) {
-        X2cImages.load(target, moduleName, name);
+        loadImage(target, name, ImageLoadAdapter.NONE);
     }
 
     public void loadImage(ImageView target, String name, ImageLoadListener listener) {
+        if (systemResources) {
+            Objects.requireNonNull(target, "target");
+            Objects.requireNonNull(listener, "listener");
+            ImageAsset asset = image(name);
+            X2cImages.cancel(target);
+            listener.onStart(asset);
+            Drawable drawable;
+            try {
+                drawable = provider.getDrawable(target.getContext(), name);
+            } catch (RuntimeException error) {
+                listener.onFailure(asset, error);
+                return;
+            }
+            target.setImageDrawable(drawable);
+            listener.onSuccess(asset);
+            return;
+        }
         X2cImages.load(target, moduleName, name, listener);
     }
 
     public void setContentView(Activity activity, String layoutName) {
-        X2C.setContentView(activity, moduleName, layoutName);
+        if (systemResources) {
+            X2C.setSystemContentView(activity, layoutName);
+        } else {
+            X2C.setContentView(activity, moduleName, layoutName);
+        }
     }
 
     public View getView(Context context, String layoutName) {
-        return X2C.getView(context, moduleName, layoutName);
+        return systemResources
+                ? X2C.getSystemView(context, layoutName)
+                : X2C.getView(context, moduleName, layoutName);
     }
 
     public View inflate(Context context, String layoutName, ViewGroup parent) {
-        return X2C.inflate(context, moduleName, layoutName, parent, parent != null);
+        return inflate(context, layoutName, parent, parent != null);
     }
 
     public View inflate(
@@ -202,7 +238,9 @@ public final class X2cResources {
             String layoutName,
             ViewGroup parent,
             boolean attachToRoot) {
-        return X2C.inflate(context, moduleName, layoutName, parent, attachToRoot);
+        return systemResources
+                ? X2C.inflateSystem(context, layoutName, parent, attachToRoot)
+                : X2C.inflate(context, moduleName, layoutName, parent, attachToRoot);
     }
 
     public <T extends View> T requireView(View root, String idName, Class<T> type) {

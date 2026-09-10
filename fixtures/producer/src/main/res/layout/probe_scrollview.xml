@@ -1,0 +1,8 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <ScrollView android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="ScrollView XML 构造示例" android:tag="ScrollView" android:fillViewport="true" android:scrollbars="vertical">
+        <LinearLayout android:id="@+id/probe_child" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:layout_width="match_parent" android:layout_height="96dp" android:gravity="center" android:background="@color/primary_soft" android:text="顶部内容"/>
+            <TextView android:id="@+id/probe_child_secondary" android:layout_width="match_parent" android:layout_height="196dp" android:gravity="center" android:background="@color/success_soft" android:text="向下滚动可见底部内容"/>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

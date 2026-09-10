@@ -16,8 +16,4 @@ public final class ComponentShowcaseLibrary {
         }
         return resources.getString("secondary_library_name");
     }
-
-    public static String activityClassName() {
-        return ComponentShowcaseActivity.class.getName();
-    }
 }

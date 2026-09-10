@@ -1,0 +1,30 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:background="@drawable/video_card_surface">
+    <FrameLayout android:id="@+id/video_cover_frame" android:layout_width="match_parent" android:layout_height="149dp" android:background="#202328">
+        <ImageView android:id="@+id/video_cover" android:layout_width="match_parent" android:layout_height="match_parent"
+            android:layout_marginBottom="18dp" android:scaleType="fitXY"/>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="22dp"
+            android:layout_gravity="bottom" android:paddingLeft="8dp" android:paddingRight="6dp"
+            android:gravity="center_vertical" android:background="@drawable/video_metrics_scrim">
+            <ImageView android:id="@+id/video_play_icon" android:layout_width="14dp" android:layout_height="12dp"/>
+            <TextView android:id="@+id/video_metrics" android:layout_width="wrap_content" android:layout_height="match_parent"
+                android:gravity="center_vertical" android:paddingLeft="3dp" android:textColor="#FFFFFF" android:textSize="10sp"/>
+            <ImageView android:id="@+id/video_danmaku_icon" android:layout_width="14dp" android:layout_height="12dp" android:layout_marginLeft="12dp"/>
+            <TextView android:id="@+id/video_danmaku" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent"
+                android:gravity="center_vertical" android:paddingLeft="3dp" android:textColor="#FFFFFF" android:textSize="10sp"/>
+            <TextView android:id="@+id/video_duration" android:layout_width="wrap_content" android:layout_height="match_parent"
+                android:gravity="center_vertical" android:text="00:08" android:textColor="#FFFFFF" android:textSize="10sp"/>
+        </LinearLayout>
+    </FrameLayout>
+    <TextView android:id="@+id/video_title" android:layout_width="match_parent" android:layout_height="55dp"
+        android:paddingLeft="8dp" android:paddingRight="8dp" android:paddingTop="8dp"
+        android:textSize="12.5sp" android:textColor="#222326" android:maxLines="2" android:ellipsize="end"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="28dp" android:gravity="center_vertical" android:paddingLeft="8dp">
+        <ImageView android:id="@+id/video_up_icon" android:layout_width="14dp" android:layout_height="12dp"/>
+        <TextView android:id="@+id/video_author" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent"
+            android:gravity="center_vertical" android:paddingLeft="5dp" android:textSize="11sp" android:textColor="#999EA6" android:singleLine="true" android:ellipsize="end"/>
+        <ImageView android:id="@+id/video_more" android:layout_width="26dp" android:layout_height="match_parent"
+            android:paddingLeft="11dp" android:paddingRight="11dp" android:paddingTop="8dp" android:paddingBottom="8dp" android:contentDescription="视频更多操作"/>
+    </LinearLayout>
+</LinearLayout>

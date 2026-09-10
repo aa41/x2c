@@ -1,0 +1,4 @@
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:layout_width="match_parent" android:layout_height="48dp" android:text="原生 merge 第一项"/>
+    <TextView android:layout_width="match_parent" android:layout_height="48dp" android:text="原生 merge 第二项"/>
+</merge>

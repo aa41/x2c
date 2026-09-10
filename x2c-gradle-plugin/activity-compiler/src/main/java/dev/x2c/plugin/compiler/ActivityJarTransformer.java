@@ -26,7 +26,7 @@ import org.objectweb.asm.Opcodes;
 /** Converts annotated Android components and emits one direct-constructor component factory. */
 public final class ActivityJarTransformer {
     /** Host/plugin bytecode protocol emitted by this compiler. */
-    public static final int CURRENT_RUNTIME_ABI = 1;
+    public static final int CURRENT_RUNTIME_ABI = 2;
 
     public static final String REGISTRY_CLASS_NAME =
             "dev.x2c.generated.plugin.ComponentRegistry";

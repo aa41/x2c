@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <RelativeLayout android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="RelativeLayout XML 构造示例" android:tag="RelativeLayout">
+        <TextView android:id="@+id/probe_child" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentLeft="true" android:layout_alignParentTop="true" android:padding="8dp" android:background="@color/primary_soft" android:text="左上锚点"/>
+        <Button android:id="@+id/probe_child_secondary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_below="@id/probe_child" android:layout_alignParentRight="true" android:text="右侧 / 位于锚点下方"/>
+    </RelativeLayout>
+</LinearLayout>

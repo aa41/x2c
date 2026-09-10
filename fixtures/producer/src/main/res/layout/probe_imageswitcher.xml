@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <ImageSwitcher android:id="@+id/probe_specimen" android:layout_width="match_parent" android:layout_height="220dp" android:padding="8dp" android:alpha="0.9" android:enabled="true" android:contentDescription="ImageSwitcher XML 构造示例" android:tag="ImageSwitcher">
+        <ImageView android:id="@+id/probe_child" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/matrix_gradient" android:scaleType="centerCrop"/>
+        <ImageView android:id="@+id/probe_child_secondary" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/matrix_oval" android:scaleType="centerInside"/>
+    </ImageSwitcher>
+</LinearLayout>

@@ -11,6 +11,7 @@ import dev.x2c.plugin.base.BasePluginReceiver;
 @X2cPluginReceiver
 public final class ComponentProbeReceiver extends BasePluginReceiver {
     @Override public void onReceive(Context context, Intent intent) {
+        ComponentState.verifyHostApplication(context, ComponentProbeReceiver.class);
         boolean ordered = isOrderedBroadcast();
         ComponentState.receiver = "Receiver: " + (ordered ? "ordered" : "normal")
                 + " · action=" + intent.getAction();

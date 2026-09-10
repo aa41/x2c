@@ -43,9 +43,8 @@ codegen.jar
 - consumer release APK 构建成功，宿主 `classes.dex` 不含任何 producer/generated class；APK 为两个测试
   payload 各携带 DEX JAR、signed descriptor 和 RSA signature，标准 AGP 仍保留空 `resources.arsc`。
 - `aapt2 dump resources` 只输出 `Binary APK`，没有 resource package entries。
-- 编译器 36 项自测覆盖完整 synthetic R2、namespace bootstrap 自动发现、normal 模式宿主 ID/本地位图绑定、多 layout runtime registry、未声明 ID 拒绝、framework ViewGroup/LayoutParams 矩阵、扩展 values、Android 文本转义、color selector、shape/selector/组合 drawable 与 API 门槛；未知文本转义会构建期失败。
+- 编译器 38 项自测覆盖完整 synthetic R2、`0x70xxxxxx` View ID/keyed-tag 约束和跨模块命名空间、namespace bootstrap 自动发现、normal 模式宿主 ID/本地位图绑定、多 layout runtime registry、未声明 ID 拒绝、framework ViewGroup/LayoutParams 矩阵、扩展 values、Android 文本转义、color selector、shape/selector/组合 drawable 与 API 门槛；未知文本转义会构建期失败。
 - producer 中多种构造策略 fixture 加一个真实 `FlowLayout extends ViewGroup`；后者使用自定义 `MarginLayoutParams`、静态 factory、三个类型化 layout setter 和 children-finished hook，生成源码经 Android JavaCompile 成功，报告记录 `customViews=5`。
-- JVM probe 已在普通 JDK `URLClassLoader` 中执行并返回 `PASS checksum=175`；同一套内部类、局部类、匿名类、lambda、方法引用、泛型、record、switch、异常、同步与逻辑运算代码已通过 D8。
 - producer `DemoActivity` 只存在于 DEX JAR，不存在于 producer/consumer Manifest。当前 fixture 已使用独立
   `business-base` Android library：宿主 `implementation` 副本保持 `BusinessBaseActivity -> Activity`，两个
   插件从 `compileOnly project` 只复制 `@X2cPluginBase` 最小转换单元并转换为
@@ -63,7 +62,7 @@ codegen.jar
   payload SHA-256 descriptor 执行 RSA 验签；在动态代码落盘前拒绝 runtime ABI 不匹配，写入前设为只读，并拒绝
   降级或相同 versionCode 的内容替换。
 - 全部源码中的进程级 `X2C.init(context)` 调用只存在于 plugin demo 的 `HostApplication` 和 normal demo
-  的 `NormalApplication`，两者均位于 `attachBaseContext`。loader、业务 Activity、generated bootstrap/module
+  的 `NormalApplication`，两者均位于真实 Application 的 `onCreate`（normal demo 另含绑定拒绝测试）。loader、业务 Activity、generated bootstrap/module
   不再重新绑定宿主；generated module 只用 `requireInitialized` 校验，并以 volatile 双重检查完成每个
   ClassLoader/module 一次的 Provider/Layout 注册。anchor class 到 module name 的结果也会缓存。
 - 已在 LG LM-V600 真机验证宿主持有的 runtime、plugin-first/host-fallback `PluginClassLoader`、动态 Activity
