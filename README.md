@@ -18,6 +18,35 @@ Application 共享、宿主初始化和 ClassLoader 身份约定见 [宿主 Appl
 - [Android 插件组件协议](docs/PLUGIN_COMPONENTS.md)
 - [pluginMode 安全切换指南](docs/PLUGIN_MODE.md)
 
+## AI Agent 接入 Skill
+
+仓库提供标准 `SKILL.md` 包 [x2c-android-integration](skills/x2c-android-integration/SKILL.md)，
+用于让 Codex、Claude Code、Cursor、Gemini CLI、GitHub Copilot 与 OpenCode 完成能力说明、环境预检、
+plugin/normal 安全接入、构建产物后检、设备验证及故障恢复。Skill 内的检查脚本只读目标项目；实际改动、
+构建、安装、提交和发布仍遵循用户对 Agent 的明确授权。
+
+按项目安装，推荐只安装团队实际使用的工具：
+
+```bash
+python3 scripts/install-x2c-skill.py \
+  --tool codex --tool claude \
+  --scope project --target /path/to/android-project
+
+# 同时安装到当前支持的全部项目目录
+python3 scripts/install-x2c-skill.py --tool all --scope project --target /path/to/android-project
+
+# 校验已安装副本与仓库版本一致
+python3 scripts/install-x2c-skill.py --tool codex --tool claude \
+  --scope project --target /path/to/android-project --check
+```
+
+个人级安装使用 `--scope user`。安装器不会隐式覆盖不同版本；显式 `--replace` 时会先将旧目录移动为
+带时间戳的 backup，再原子安装新副本。安装后可直接请求：
+
+```text
+使用 $x2c-android-integration 对 :feature 和 :app 做 plugin 模式预检并给出安全接入方案。
+```
+
 ## 编译器结构
 
 对外入口固定为 `dev.x2c.compiler.ResourceCompiler`；原有 overload 保持兼容，新增带 `pluginMode` 的完整入口。实现位于 `dev.x2c.compiler.resource`，按稳定流水线拆分：

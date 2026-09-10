@@ -1,0 +1,6 @@
+interface:
+  display_name: "X2C Android Integration"
+  short_description: "Safely audit, integrate, and verify X2C Android modes"
+  default_prompt: "Use $x2c-android-integration to preflight and safely integrate X2C into this Android project."
+policy:
+  allow_implicit_invocation: true
