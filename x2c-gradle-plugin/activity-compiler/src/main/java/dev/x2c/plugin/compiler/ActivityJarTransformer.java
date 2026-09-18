@@ -26,7 +26,7 @@ import org.objectweb.asm.Opcodes;
 /** Converts annotated Android components and emits one direct-constructor component factory. */
 public final class ActivityJarTransformer {
     /** Host/plugin bytecode protocol emitted by this compiler. */
-    public static final int CURRENT_RUNTIME_ABI = 2;
+    public static final int CURRENT_RUNTIME_ABI = 4;
 
     public static final String REGISTRY_CLASS_NAME =
             "dev.x2c.generated.plugin.ComponentRegistry";
@@ -105,7 +105,9 @@ public final class ActivityJarTransformer {
             }
             switch (model.kind) {
                 case ACTIVITY:
-                    activities.add(new TransformedActivity(model.name, model.launchMode));
+                    validateThemeKey(model);
+                    activities.add(new TransformedActivity(
+                            model.name, model.launchMode, model.themeKey));
                     break;
                 case SERVICE:
                     services.add(new TransformedComponent(model.name, null));
@@ -183,6 +185,7 @@ public final class ActivityJarTransformer {
                 return new AnnotationVisitor(Opcodes.ASM9) {
                     @Override public void visit(String name, Object value) {
                         if ("authority".equals(name)) model.authority = String.valueOf(value);
+                        if ("themeKey".equals(name)) model.themeKey = String.valueOf(value);
                     }
 
                     @Override public void visitEnum(String name, String descriptor, String value) {
@@ -226,6 +229,16 @@ public final class ActivityJarTransformer {
         if (!authorities.add(model.authority)) {
             throw new IllegalStateException(
                     "Duplicate plugin ContentProvider authority: " + model.authority);
+        }
+    }
+
+    private static void validateThemeKey(ClassModel model) {
+        if (!model.themeKey.isEmpty()
+                && !model.themeKey.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) {
+            throw new IllegalStateException(
+                    "@X2cPluginActivity themeKey must contain 1-128 letters, digits, '.', '_' "
+                            + "or '-' and start with a letter or digit: "
+                            + model.name.replace('/', '.'));
         }
     }
 
@@ -391,6 +404,7 @@ public final class ActivityJarTransformer {
         String name;
         String superName;
         String launchMode = "STANDARD";
+        String themeKey = "";
         String authority;
         ComponentKind kind;
         boolean publicNoArgConstructor;

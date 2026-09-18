@@ -1,5 +1,6 @@
 apply plugin: 'com.android.library'
 
+def x2cVersion = rootProject.file('../../VERSION').text.trim()
 def selectedAgp = (findProperty('agpVersion') ?: '3.5.4').toString()
 def agpMajor = Integer.parseInt(selectedAgp.tokenize('.')[0])
 
@@ -11,7 +12,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'dev.x2c:x2c-plugin-api:0.1.0-SNAPSHOT'
+    compileOnly "dev.x2c:x2c-plugin-api:${x2cVersion}"
 }
 
 android {

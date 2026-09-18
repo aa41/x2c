@@ -1,4 +1,5 @@
 buildscript {
+    def x2cVersion = rootProject.file('../../VERSION').text.trim()
     repositories {
         maven { url uri('../../build/compat-maven-cache') }
         google()
@@ -7,11 +8,12 @@ buildscript {
     }
     dependencies {
         classpath "com.android.tools.build:gradle:${findProperty('agpVersion') ?: '3.5.4'}"
-        classpath 'dev.x2c:x2c-gradle-plugin:0.1.0-SNAPSHOT'
-        classpath 'dev.x2c:activity-gradle-plugin:0.1.0-SNAPSHOT'
+        classpath "dev.x2c:x2c-gradle-plugin:${x2cVersion}"
+        classpath "dev.x2c:activity-gradle-plugin:${x2cVersion}"
     }
 }
 
+def x2cVersion = rootProject.file('../../VERSION').text.trim()
 def pluginPayloadMode = (findProperty('x2cPluginMode') ?: 'true').toBoolean()
 def x2cEnableValue = (findProperty('x2c.enable') ?: 'true').toString()
 if (!(x2cEnableValue in ['true', 'false'])) {
@@ -37,12 +39,12 @@ dependencies {
         compileOnly project(':business-base')
     }
     if (pluginPayloadMode) {
-        compileOnly 'dev.x2c:x2c-runtime:0.1.0-SNAPSHOT'
+        compileOnly "dev.x2c:x2c-runtime:${x2cVersion}"
     } else {
-        api 'dev.x2c:x2c-runtime:0.1.0-SNAPSHOT'
+        api "dev.x2c:x2c-runtime:${x2cVersion}"
     }
     if (pluginPayloadMode) {
-        compileOnly 'dev.x2c:x2c-plugin-api:0.1.0-SNAPSHOT'
+        compileOnly "dev.x2c:x2c-plugin-api:${x2cVersion}"
     }
 }
 

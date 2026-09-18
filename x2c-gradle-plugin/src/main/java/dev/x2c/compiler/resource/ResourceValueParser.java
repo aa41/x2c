@@ -54,7 +54,8 @@ final class ResourceValueParser {
         }
         if (value.startsWith("@color/")) {
             String reference = referenceName(value, "color");
-            if (!model.colors.containsKey(reference)) {
+            if (!model.colors.containsKey(reference)
+                    && !model.hostResources.use("color", reference)) {
                 throw fail(file, "Unknown color reference: " + value);
             }
             return ColorValue.reference(reference);
@@ -179,7 +180,8 @@ final class ResourceValueParser {
         String value = requireAttribute(file, element, name);
         if (value.startsWith("@color/")) {
             String reference = referenceName(value, "color");
-            if (!model.colors.containsKey(reference)) {
+            if (!model.colors.containsKey(reference)
+                    && !model.hostResources.use("color", reference)) {
                 throw fail(file, "Unknown color reference: " + value);
             }
             return ColorValue.reference(reference);
@@ -190,7 +192,8 @@ final class ResourceValueParser {
     static DimensionValue resolveDimension(File file, String value, Model model) {
         if (value.startsWith("@dimen/")) {
             String reference = referenceName(value, "dimen");
-            if (!model.dimens.containsKey(reference)) {
+            if (!model.dimens.containsKey(reference)
+                    && !model.hostResources.use("dimen", reference)) {
                 throw fail(file, "Unknown dimen reference: " + value);
             }
             return DimensionValue.reference(reference);
@@ -201,7 +204,8 @@ final class ResourceValueParser {
     static void resolveColorOrDrawable(File file, String value, Model model, boolean colorOnly) {
         if (value.startsWith("@color/")) {
             String reference = referenceName(value, "color");
-            if (!model.colors.containsKey(reference)) {
+            if (!model.colors.containsKey(reference)
+                    && !model.hostResources.use("color", reference)) {
                 throw fail(file, "Unknown color reference: " + value);
             }
             return;
@@ -239,9 +243,34 @@ final class ResourceValueParser {
     static void resolveGeneratedDrawable(File file, String value, Model model) {
         String reference = referenceName(value, "drawable");
         String kind = model.drawableKinds.get(reference);
-        if (kind == null || kind.equals("bitmap")) {
-            throw fail(file, "Expected a synchronous generated drawable, got: " + value);
+        if (kind != null) {
+            if (kind.equals("bitmap")) {
+                throw fail(file, "Expected a synchronous generated drawable, got: " + value);
+            }
+            return;
         }
+        if (model.hostResources.use("drawable", reference)) {
+            return;
+        }
+        throw fail(file, "Expected a synchronous generated drawable, got: " + value);
+    }
+
+    static void resolveCompoundDrawable(File file, String value, Model model) {
+        String reference = referenceName(value, "drawable");
+        String kind = model.drawableKinds.get(reference);
+        if (kind != null) {
+            if (kind.equals("bitmap") && model.pluginMode) {
+                throw fail(
+                        file,
+                        "CDN bitmap cannot be used as a synchronous TextView compound drawable: "
+                                + value);
+            }
+            return;
+        }
+        if (model.hostResources.use("drawable", reference)) {
+            return;
+        }
+        throw fail(file, "Unknown compound drawable reference: " + value);
     }
 
     static void resolveBitmapDrawable(File file, String value, Model model) {
@@ -254,7 +283,8 @@ final class ResourceValueParser {
     static void resolveBoolean(File file, String value, Model model, String name) {
         if (value.startsWith("@bool/")) {
             String reference = referenceName(value, "bool");
-            if (!model.bools.containsKey(reference)) {
+            if (!model.bools.containsKey(reference)
+                    && !model.hostResources.use("bool", reference)) {
                 throw fail(file, "Unknown bool reference: " + value);
             }
             return;
@@ -265,7 +295,8 @@ final class ResourceValueParser {
     static void resolveInteger(File file, String value, Model model, String name) {
         if (value.startsWith("@integer/")) {
             String reference = referenceName(value, "integer");
-            if (!model.integers.containsKey(reference)) {
+            if (!model.integers.containsKey(reference)
+                    && !model.hostResources.use("integer", reference)) {
                 throw fail(file, "Unknown integer reference: " + value);
             }
             return;
@@ -280,7 +311,8 @@ final class ResourceValueParser {
     static void resolveFraction(File file, String value, Model model) {
         if (value.startsWith("@fraction/")) {
             String reference = referenceName(value, "fraction");
-            if (!model.fractions.containsKey(reference)) {
+            if (!model.fractions.containsKey(reference)
+                    && !model.hostResources.use("fraction", reference)) {
                 throw fail(file, "Unknown fraction reference: " + value);
             }
             return;
@@ -290,7 +322,8 @@ final class ResourceValueParser {
 
     static void resolveDrawable(File file, String value, Model model) {
         String reference = referenceName(value, "drawable");
-        if (!model.drawableKinds.containsKey(reference)) {
+        if (!model.drawableKinds.containsKey(reference)
+                && !model.hostResources.use("drawable", reference)) {
             throw fail(file, "Unknown drawable reference: " + value);
         }
     }
@@ -300,7 +333,8 @@ final class ResourceValueParser {
             return;
         }
         String reference = referenceName(value, "string");
-        if (!model.strings.containsKey(reference)) {
+        if (!model.strings.containsKey(reference)
+                && !model.hostResources.use("string", reference)) {
             throw fail(file, "Unknown string reference: " + value);
         }
     }

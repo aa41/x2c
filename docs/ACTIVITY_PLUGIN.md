@@ -5,11 +5,16 @@
 本文只描述 Activity 子协议。Service、BroadcastReceiver、ContentProvider 的代理、安全边界和验证见
 [Android 插件组件协议](PLUGIN_COMPONENTS.md)。插件的 library Manifest 必须保持无业务组件声明，宿主只合并
 runtime 预声明的固定非导出代理容器。
+Activity 主题同样不从插件 Manifest 读取：只有 `@X2cPluginActivity.themeKey` 会进入
+`activities.json`，并由宿主 `PluginHostConfig` 映射为真实 style。normal AAR 中相同注解不生效，
+原生 Activity 继续遵循合并后的 Manifest theme。
 
 插件开发代码仍使用正常的 framework 类型：
 
 ```java
-@X2cPluginActivity(launchMode = PluginLaunchMode.SINGLE_TOP)
+@X2cPluginActivity(
+        launchMode = PluginLaunchMode.SINGLE_TOP,
+        themeKey = "commerce.detail.light.v1")
 public final class DetailActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -56,7 +61,8 @@ public abstract class BusinessBaseActivity extends Activity { /* ... */ }
 ```
 
 插件使用 `compileOnly(project(":business-base"))`，宿主使用 `implementation`。构建器只复制被插件入口
-真实继承的标注 base 链、nest/内部实现类以及 `include` 明确声明的插件私有闭包。普通 compileOnly 引用
+真实继承的标注 base 链、nest/内部实现类、Java 8 `EnclosingMethod` 关联的匿名/局部类，以及 `include`
+明确声明的插件私有闭包。普通 compileOnly 引用
 不会复制进 payload；插件 ClassLoader 查找不到时会自动交给宿主 ClassLoader。仅宿主
 BaseActivity、AppCompat/FragmentActivity/ComponentActivity 仍会在 Activity 继承闭包
 无法闭合时构建失败。遗漏入口注解、单
@@ -98,8 +104,10 @@ BaseActivity。Shadow 的插件基类代码和生命周期可以执行，是因�
 Android/Java 平台包强制 parent-first，避免 singleton 与类型身份分裂；其余业务类 plugin-first，插件中
 不存在时自然回退宿主。因此宿主业务能力不需要额外注解，但如果同名类也被显式打进插件，则插件副本优先。
 
-宿主在真实 `Application.onCreate` 或加固 SDK 确认环境就绪后调用 `X2C.init(this)`。
-组件 runtime ABI 2 的 Application 与代码身份契约见 [HOST_APPLICATION_CONTRACT](HOST_APPLICATION_CONTRACT.md)。插件安装器、generated `X2cModule`、Activity 和资源访问只验证宿主已经
+插件宿主在真实 `Application.onCreate` 或加固 SDK 确认环境就绪后调用
+`X2C.init(application, PluginHostConfig)`；它同时初始化基础 runtime 并一次性解析宿主拥有的
+Activity 主题表。组件 runtime ABI 4 的 Application、主题与代码身份契约见
+[HOST_APPLICATION_CONTRACT](HOST_APPLICATION_CONTRACT.md)。插件安装器、generated `X2cModule`、Activity 和资源访问只验证宿主已经
 初始化，不再重复绑定 Context/ClassLoader。每个插件 module 的 Provider/Layout registry 在首次 load 时
 初始化一次，并缓存业务 anchor class 到 module 的映射；后续 `X2C.resources(Activity.class)` 不再执行
 bootstrap 反射。
@@ -137,7 +145,7 @@ window focus、user interaction/leave hint。
 已代理的主要能力：
 
 - Window、theme/resources、LayoutInflater、set/add content、find/require View、current focus；
-- Intent/component、title、Application、task/orientation、finish/recreate/back；
+- Intent/component、title、Application、task/orientation、finish/recreate/back、finish-on-touch-outside；
 - plugin 内/外 `startActivity` 和 `startActivityForResult`；
 - result、permission、UI thread、volume/media controller、window feature/progress/feature drawable final API。
 
@@ -146,10 +154,18 @@ fixture 组件矩阵实际覆盖：宿主→插件、同插件普通显式 `Inte
 `PluginActivityManager.startActivity(...)` 明确给出目标 pluginId；同插件显式 Intent 会由 delegate
 自动识别并路由。`scripts/verify-plugin-showcases.sh` 可在连接设备上从冷启动自动执行完整链路。
 
-Java 不能 override 的 final Activity API 由 transformer 改写到 `PluginActivity` bridge；helper class 以具体
-plugin Activity 类型调用时也会改写。已知无法保持语义的 deprecated managed-dialog/keyboard/splash 等 final
+Java 不能 override 的 final Activity API 由 transformer 改写到 receiver-aware 静态 bridge。bridge 运行时
+仅把 `PluginActivity` 接收者切换到真实容器，外部真实 Activity 保持原调用；helper class 中以
+`Activity` 声明的接收者也因此安全。`setFinishOnTouchOutside` 本身不是 final，由 `PluginActivity` 正常 override。
+已知无法保持语义的 deprecated managed-dialog/keyboard/splash 等 final
 API 会构建失败。当前没有转发 options/context menu、FragmentManager/LoaderManager、PiP、voice interaction、
 Activity embedding 和任意 Window callback；这些能力在加入专门协议和测试之前不属于支持范围。
+
+当前实现是轻量、受限的 Activity ABI，不等价于完整 Shadow。Shadow 的稳定性来自把插件字节码中的
+`Activity` 类型整体替换为不继承 framework Activity 的代理类型，并按目标 Android SDK 自动生成容器、
+delegate 和 API 转发表；它不是复制 framework Activity 字段。面向多个长期演进的真实项目，下一阶段应采用
+这种“android.jar 驱动的代理代码生成 + ABI 差异审计”设计。直接引入完整 Shadow 仅在需要其 APK 资源、
+AndroidX/Fragment 与完整组件生态时更合适；本项目的 class-only JAR 仍可保留自己的加载器与 X2C 资源层。
 
 Activity 构造函数/字段初始化阶段不得访问 Context、Window 或 Resources；delegate 在构造完成后才 attach
 真实容器。attach 会在 runtime 状态注入完成后通过虚调用进入业务/BaseActivity 的
@@ -202,6 +218,7 @@ Play 的 Device and Network Abuse 政策通常禁止应用从 Google Play 之外
 ## 已有验证
 
 - ASM 自测：三层 BaseActivity 继承链只改最底 framework 锚点、标注 compileOnly base/helper/include 精确闭包、
+  Java 8 匿名类结构闭包、`setFinishOnTouchOutside` 虚分派 override、final API receiver-aware bridge、
   非 Activity 标注根和未标注外部基类拒绝、基类 final API bridge、
   direct Activity 与 lifecycle super call、跨 helper final API callsite、annotation/launchMode、direct registry、
   deterministic JAR、遗漏 annotation、无法桥接的 final API 和 8-slot 上限 fail-closed；

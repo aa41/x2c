@@ -56,9 +56,12 @@ final class CompilationReportWriter {
         report.counts.put("cdnImages", lockedAssets.size());
         report.counts.put("hostBitmapDrawables", pluginMode ? 0 : model.bitmaps.size());
         report.counts.put("customViews", model.customViews.declaredViewCount());
+        report.counts.put("inferredHostResources", model.hostResources.size());
+        report.inferredHostResources = model.hostResources.entries();
         report.invariants = Arrays.asList(
                 "qualifiers=0",
                 "unsupported=0",
+                "host-resource-dependencies=inferred-and-preflighted",
                 pluginMode ? "resource-ids=synthetic" : "resource-ids=host-getIdentifier",
                 pluginMode
                         ? "bitmap=content-addressed-https-lock"

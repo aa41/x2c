@@ -222,8 +222,6 @@ final class FrameworkViewRegistry {
           "longClickable",
           "focusable",
           "focusableInTouchMode",
-          "selected",
-          "activated",
           "saveEnabled",
           "keepScreenOn",
           "fitsSystemWindows",
@@ -344,6 +342,13 @@ final class FrameworkViewRegistry {
                   "textAllCaps",
                   "textIsSelectable",
                   "selectAllOnFocus",
+                  "drawableLeft",
+                  "drawableTop",
+                  "drawableRight",
+                  "drawableBottom",
+                  "drawableStart",
+                  "drawableEnd",
+                  "drawablePadding",
                   "inputType",
                   "imeOptions")
               .contains(name);
@@ -396,7 +401,10 @@ final class FrameworkViewRegistry {
           || "ViewFlipper".equals(node.tag)) {
         return set("foregroundGravity", "measureAllChildren").contains(name);
       }
-      if ("RelativeLayout".equals(node.tag)) return set("gravity", "ignoreGravity").contains(name);
+      if ("RelativeLayout".equals(node.tag)) {
+        // android:orientation is accepted but ignored by the platform RelativeLayout as well.
+        return set("gravity", "ignoreGravity", "orientation").contains(name);
+      }
       if ("GridLayout".equals(node.tag)) {
         return set(
                 "orientation",

@@ -23,6 +23,8 @@ import org.objectweb.asm.Opcodes;
 
 public final class ActivityJarTransformerSelfTest {
     public static void main(String[] args) throws Exception {
+        require(ActivityJarTransformer.CURRENT_RUNTIME_ABI == 4,
+                "Activity runtime ABI must be bumped when the host/plugin bridge changes");
         Path root = Files.createTempDirectory("x2c-activity-transform-");
         try {
             Path input = root.resolve("input.jar");
@@ -42,8 +44,11 @@ public final class ActivityJarTransformerSelfTest {
                     "Transformed JAR must be deterministic");
 
             Map<String, byte[]> classes = readJar(first.toFile());
-            verifyActivity(classes.get("sample/FirstActivity.class"), "SINGLE_TOP");
-            verifyActivity(classes.get("sample/SecondActivity.class"), "STANDARD");
+            verifyActivity(
+                    classes.get("sample/FirstActivity.class"),
+                    "SINGLE_TOP",
+                    "sample.detail.light.v1");
+            verifyActivity(classes.get("sample/SecondActivity.class"), "STANDARD", "");
             verifyActivityHierarchy(classes);
             verifySharedBaseHierarchy(classes);
             verifySuperclass(classes.get("sample/ProbeService.class"),
@@ -72,6 +77,7 @@ public final class ActivityJarTransformerSelfTest {
             verifyCompileOnlyBaseClosure(root);
             verifyHostFallbackWithoutBusinessBase(root);
             verifyCompileOnlyStructuralClosure(root);
+            verifyCompileOnlyAnonymousClassClosure(root);
             verifyFailClosed(root);
             System.out.println("ActivityJarTransformerSelfTest: passed");
         } finally {
@@ -266,10 +272,42 @@ public final class ActivityJarTransformerSelfTest {
                 "BaseActivity structural nest member was not copied");
     }
 
+    private static void verifyCompileOnlyAnonymousClassClosure(Path root) throws Exception {
+        Path plugin = root.resolve("anonymous-base-plugin.jar");
+        try (JarOutputStream jar = new JarOutputStream(
+                new BufferedOutputStream(new FileOutputStream(plugin.toFile())))) {
+            add(jar, "sample/AnonymousActivity.class", activity(
+                    "sample/AnonymousActivity", "business/AnonymousBaseActivity", null));
+        }
+        Path compileOnly = root.resolve("anonymous-base.jar");
+        try (JarOutputStream jar = new JarOutputStream(
+                new BufferedOutputStream(new FileOutputStream(compileOnly.toFile())))) {
+            add(jar, "business/AnonymousBaseActivity.class",
+                    markedBaseWithAnonymousClass("business/AnonymousBaseActivity",
+                            "business/AnonymousBaseActivity$1"));
+            add(jar, "business/AnonymousBaseActivity$1.class",
+                    anonymousObject("business/AnonymousBaseActivity$1",
+                            "business/AnonymousBaseActivity"));
+        }
+        Path output = root.resolve("anonymous-base-output.jar");
+        ActivityTransformResult result = new ActivityJarTransformer().transform(
+                plugin.toFile(), Collections.<File>emptyList(),
+                Collections.singleton(compileOnly.toFile()), output.toFile(),
+                "sample.anonymous-base");
+        require(result.dependencies.size() == 1
+                        && result.dependencies.get(0).classCount == 2,
+                "BaseActivity and its Java 8 anonymous class must remain one transform unit");
+        require(readJar(output.toFile()).containsKey(
+                        "business/AnonymousBaseActivity$1.class"),
+                "BaseActivity Java 8 anonymous class was not copied");
+    }
+
     private static void writeInput(Path path) throws Exception {
         try (JarOutputStream jar = new JarOutputStream(
                 new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
-            add(jar, "sample/FirstActivity.class", activity("sample/FirstActivity", "SINGLE_TOP"));
+            add(jar, "sample/FirstActivity.class", activity(
+                    "sample/FirstActivity", "android/app/Activity", "SINGLE_TOP",
+                    "sample.detail.light.v1"));
             add(jar, "sample/SecondActivity.class", activity("sample/SecondActivity", null));
             add(jar, "sample/RootBaseActivity.class", baseActivity(
                     "sample/RootBaseActivity", "android/app/Activity"));
@@ -325,10 +363,15 @@ public final class ActivityJarTransformerSelfTest {
     }
 
     private static byte[] activity(String name, String launchMode) {
-        return activity(name, "android/app/Activity", launchMode);
+        return activity(name, "android/app/Activity", launchMode, "");
     }
 
     private static byte[] activity(String name, String superName, String launchMode) {
+        return activity(name, superName, launchMode, "");
+    }
+
+    private static byte[] activity(
+            String name, String superName, String launchMode, String themeKey) {
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
                 name, null, superName, null);
@@ -336,6 +379,9 @@ public final class ActivityJarTransformerSelfTest {
                 "Ldev/x2c/plugin/api/X2cPluginActivity;", false);
         if (launchMode != null) {
             annotation.visitEnum("launchMode", "Ldev/x2c/plugin/api/PluginLaunchMode;", launchMode);
+        }
+        if (themeKey != null && !themeKey.isEmpty()) {
+            annotation.visit("themeKey", themeKey);
         }
         annotation.visitEnd();
         MethodVisitor constructor = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
@@ -380,6 +426,12 @@ public final class ActivityJarTransformerSelfTest {
         create.visitVarInsn(Opcodes.ALOAD, 1);
         create.visitMethodInsn(
                 Opcodes.INVOKESPECIAL, superName, "onCreate", "(Landroid/os/Bundle;)V", false);
+        if ("android/app/Activity".equals(superName)) {
+            create.visitVarInsn(Opcodes.ALOAD, 0);
+            create.visitInsn(Opcodes.ICONST_0);
+            create.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
+                    "android/app/Activity", "setFinishOnTouchOutside", "(Z)V", false);
+        }
         create.visitInsn(Opcodes.RETURN);
         create.visitMaxs(0, 0);
         create.visitEnd();
@@ -522,6 +574,59 @@ public final class ActivityJarTransformerSelfTest {
         return writer.toByteArray();
     }
 
+    private static byte[] markedBaseWithAnonymousClass(String name, String anonymousName) {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_ABSTRACT,
+                name, null, "android/app/Activity", null);
+        writer.visitInnerClass(anonymousName, null, null, 0);
+        writer.visitAnnotation("Ldev/x2c/plugin/api/X2cPluginBase;", false).visitEnd();
+        MethodVisitor constructor = writer.visitMethod(
+                Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "android/app/Activity", "<init>", "()V", false);
+        constructor.visitInsn(Opcodes.RETURN);
+        constructor.visitMaxs(0, 0);
+        constructor.visitEnd();
+        writer.visitMethod(0, "packagePrivateHook", "()V", null, null).visitEnd();
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
+    private static byte[] anonymousObject(String name, String owner) {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_FINAL | Opcodes.ACC_SUPER,
+                name, null, "java/lang/Object", new String[] {"java/lang/Runnable"});
+        writer.visitOuterClass(owner, null, null);
+        writer.visitInnerClass(name, null, null, 0);
+        writer.visitField(Opcodes.ACC_FINAL | Opcodes.ACC_SYNTHETIC,
+                "this$0", "L" + owner + ";", null, null).visitEnd();
+        MethodVisitor constructor = writer.visitMethod(
+                0, "<init>", "(L" + owner + ";)V", null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitVarInsn(Opcodes.ALOAD, 1);
+        constructor.visitFieldInsn(
+                Opcodes.PUTFIELD, name, "this$0", "L" + owner + ";");
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        constructor.visitInsn(Opcodes.RETURN);
+        constructor.visitMaxs(0, 0);
+        constructor.visitEnd();
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC, "run", "()V", null, null);
+        run.visitCode();
+        run.visitVarInsn(Opcodes.ALOAD, 0);
+        run.visitFieldInsn(Opcodes.GETFIELD, name, "this$0", "L" + owner + ";");
+        run.visitMethodInsn(Opcodes.INVOKEVIRTUAL, owner, "packagePrivateHook", "()V", false);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(0, 0);
+        run.visitEnd();
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
     private static byte[] helper() {
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "sample/Helper", null,
@@ -571,10 +676,12 @@ public final class ActivityJarTransformerSelfTest {
         return writer.toByteArray();
     }
 
-    private static void verifyActivity(byte[] bytes, String expectedMode) {
+    private static void verifyActivity(
+            byte[] bytes, String expectedMode, String expectedThemeKey) {
         require(bytes != null, "Missing transformed Activity");
         final boolean[] rewrittenSuperCall = {false};
         final String[] launchMode = {"STANDARD"};
+        final String[] themeKey = {""};
         new ClassReader(bytes).accept(new ClassVisitor(Opcodes.ASM9) {
             @Override public void visit(
                     int version, int access, String name, String signature,
@@ -586,6 +693,10 @@ public final class ActivityJarTransformerSelfTest {
             @Override public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
                 if (!"Ldev/x2c/plugin/api/X2cPluginActivity;".equals(descriptor)) return null;
                 return new AnnotationVisitor(Opcodes.ASM9) {
+                    @Override public void visit(String name, Object value) {
+                        if ("themeKey".equals(name)) themeKey[0] = String.valueOf(value);
+                    }
+
                     @Override public void visitEnum(String name, String descriptor, String value) {
                         if ("launchMode".equals(name)) launchMode[0] = value;
                     }
@@ -609,6 +720,7 @@ public final class ActivityJarTransformerSelfTest {
         }, 0);
         require(rewrittenSuperCall[0], "Activity super calls were not rewritten");
         require(expectedMode.equals(launchMode[0]), "Activity launchMode annotation changed");
+        require(expectedThemeKey.equals(themeKey[0]), "Activity themeKey annotation changed");
     }
 
     private static void verifyActivityHierarchy(Map<String, byte[]> classes) {
@@ -622,6 +734,7 @@ public final class ActivityJarTransformerSelfTest {
 
         final boolean[] rootSuperRewritten = {false};
         final boolean[] baseFinalApiRewritten = {false};
+        final boolean[] finishOnTouchOutsideUsesVirtualDispatch = {false};
         new ClassReader(classes.get("sample/RootBaseActivity.class")).accept(
                 new ClassVisitor(Opcodes.ASM9) {
                     @Override public MethodVisitor visitMethod(
@@ -635,10 +748,17 @@ public final class ActivityJarTransformerSelfTest {
                                         && "dev/x2c/plugin/runtime/PluginActivity".equals(owner)) {
                                     rootSuperRewritten[0] = true;
                                 }
-                                if (opcode == Opcodes.INVOKEVIRTUAL
-                                        && "dev/x2c/plugin/runtime/PluginActivity".equals(owner)
-                                        && "getPluginApplication".equals(methodName)) {
+                                if (opcode == Opcodes.INVOKESTATIC
+                                        && "dev/x2c/plugin/runtime/ActivityApiBridge".equals(owner)
+                                        && "getApplication".equals(methodName)
+                                        && "(Landroid/app/Activity;)Landroid/app/Application;"
+                                                .equals(methodDescriptor)) {
                                     baseFinalApiRewritten[0] = true;
+                                }
+                                if (opcode == Opcodes.INVOKEVIRTUAL
+                                        && "android/app/Activity".equals(owner)
+                                        && "setFinishOnTouchOutside".equals(methodName)) {
+                                    finishOnTouchOutsideUsesVirtualDispatch[0] = true;
                                 }
                             }
                         };
@@ -646,6 +766,8 @@ public final class ActivityJarTransformerSelfTest {
                 }, 0);
         require(rootSuperRewritten[0], "Root BaseActivity super calls were not rewritten");
         require(baseFinalApiRewritten[0], "BaseActivity final API call was not bridged");
+        require(finishOnTouchOutsideUsesVirtualDispatch[0],
+                "Non-final Activity API must retain virtual dispatch to PluginActivity override");
     }
 
     private static void verifySharedBaseHierarchy(Map<String, byte[]> classes) {
@@ -678,8 +800,11 @@ public final class ActivityJarTransformerSelfTest {
                     @Override public void visitMethodInsn(
                             int opcode, String owner, String methodName,
                             String methodDescriptor, boolean isInterface) {
-                        if ("dev/x2c/plugin/runtime/PluginActivity".equals(owner)
-                                && "getPluginApplication".equals(methodName)) {
+                        if (opcode == Opcodes.INVOKESTATIC
+                                && "dev/x2c/plugin/runtime/ActivityApiBridge".equals(owner)
+                                && "getApplication".equals(methodName)
+                                && "(Landroid/app/Activity;)Landroid/app/Application;"
+                                        .equals(methodDescriptor)) {
                             rewritten[0] = true;
                         }
                     }
@@ -715,6 +840,7 @@ public final class ActivityJarTransformerSelfTest {
     private static void verifyRegistry(byte[] bytes) {
         require(bytes != null, "Generated registry is missing");
         final boolean[] contract = {false};
+        final int[] emittedRuntimeAbi = {-1};
         final Set<String> methods = new HashSet<String>();
         new ClassReader(bytes).accept(new ClassVisitor(Opcodes.ASM9) {
             @Override public void visit(
@@ -728,16 +854,27 @@ public final class ActivityJarTransformerSelfTest {
                     int access, String name, String descriptor, String signature,
                     String[] exceptions) {
                 methods.add(name);
-                return null;
+                if (!"runtimeAbiVersion".equals(name) || !"()I".equals(descriptor)) {
+                    return null;
+                }
+                return new MethodVisitor(Opcodes.ASM9) {
+                    @Override public void visitLdcInsn(Object value) {
+                        if (value instanceof Integer) {
+                            emittedRuntimeAbi[0] = ((Integer) value).intValue();
+                        }
+                    }
+                };
             }
-        }, ClassReader.SKIP_CODE);
+        }, 0);
         Set<String> required = new HashSet<String>(Arrays.asList(
-                "runtimeAbiVersion", "pluginId", "contains", "info", "create",
+                "runtimeAbiVersion", "pluginId", "contains", "info", "activities", "create",
                 "containsService", "createService",
                 "containsReceiver", "createReceiver",
                 "containsProvider", "providerInfo", "providers", "createProvider"));
         require(contract[0] && methods.containsAll(required),
                 "Generated registry contract is incomplete: " + methods);
+        require(emittedRuntimeAbi[0] == ActivityJarTransformer.CURRENT_RUNTIME_ABI,
+                "Generated registry runtime ABI does not match the compiler ABI");
     }
 
     private static void verifyFailClosed(Path root) throws Exception {
@@ -759,6 +896,17 @@ public final class ActivityJarTransformerSelfTest {
         }
         expectFailure(tooMany, root.resolve("overflow-output.jar"), "more than 8");
 
+        Path invalidThemeKey = root.resolve("invalid-theme-key.jar");
+        try (JarOutputStream jar = new JarOutputStream(
+                new BufferedOutputStream(new FileOutputStream(invalidThemeKey.toFile())))) {
+            add(jar, "sample/BadThemeActivity.class", activity(
+                    "sample/BadThemeActivity", "android/app/Activity", null, "bad theme/key"));
+        }
+        expectFailure(
+                invalidThemeKey,
+                root.resolve("invalid-theme-key-output.jar"),
+                "themeKey must contain 1-128");
+
         Path unsupportedFinalApi = root.resolve("unsupported-final-api.jar");
         try (JarOutputStream jar = new JarOutputStream(
                 new BufferedOutputStream(new FileOutputStream(unsupportedFinalApi.toFile())))) {
@@ -768,14 +916,17 @@ public final class ActivityJarTransformerSelfTest {
         expectFailure(unsupportedFinalApi, root.resolve("unsupported-final-api-output.jar"),
                 "Unsupported final Activity API in plugin bytecode: showDialog(I)V");
 
-        Path ambiguousFinalApi = root.resolve("ambiguous-final-api.jar");
+        Path receiverAwareFinalApi = root.resolve("receiver-aware-final-api.jar");
         try (JarOutputStream jar = new JarOutputStream(
-                new BufferedOutputStream(new FileOutputStream(ambiguousFinalApi.toFile())))) {
+                new BufferedOutputStream(new FileOutputStream(receiverAwareFinalApi.toFile())))) {
             add(jar, "sample/FirstActivity.class", activity("sample/FirstActivity", null));
             add(jar, "sample/AmbiguousHelper.class", ambiguousFinalApiHelper());
         }
-        expectFailure(ambiguousFinalApi, root.resolve("ambiguous-final-api-output.jar"),
-                "Ambiguous final Activity API receiver in plugin bytecode");
+        Path receiverAwareOutput = root.resolve("receiver-aware-final-api-output.jar");
+        new ActivityJarTransformer().transform(
+                receiverAwareFinalApi.toFile(), receiverAwareOutput.toFile(), "sample.receiver");
+        verifyHelperCallSite(readJar(receiverAwareOutput.toFile()).get(
+                "sample/AmbiguousHelper.class"));
 
         Path externalBase = root.resolve("external-base.jar");
         try (JarOutputStream jar = new JarOutputStream(

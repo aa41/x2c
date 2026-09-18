@@ -1,6 +1,7 @@
 package dev.x2c.fixture.normal;
 
 import android.app.Activity;
+import android.content.res.TypedArray;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.*;
@@ -25,7 +26,7 @@ public final class NormalDemoActivity extends Activity {
     label("X2C API 工作台", 26);
     label("普通 AAR / systemResources=" + res.isSystemResources(), 14);
     if (!res.isSystemResources())
-      label("生成路径边界：detached 根节点使用通用 LayoutParams；attach 后由父容器转换。返回值也与系统 inflater 不完全相同。", 13);
+      label("生成路径：detached 与 attached 都按真实父容器创建 LayoutParams；返回值保持 X2C 的 child 约定。", 13);
     button("运行全部 API 断言", this::runTests);
     button("字符串布局重新加载", () -> recreate());
     TextView count = label("点击次数：" + clicks, 16);
@@ -53,12 +54,40 @@ public final class NormalDemoActivity extends Activity {
                     && !X2C.isPlugin(NormalDemoActivity.class),
                 "host identity"));
     test(
+        "Manifest Activity theme",
+        () -> {
+          TypedArray values = obtainStyledAttributes(new int[] {android.R.attr.colorAccent});
+          try {
+            require(
+                values.getColor(0, 0)
+                    == getResources().getColor(R.color.normal_manifest_theme_accent),
+                "normal mode must use the Activity theme merged from the AAR Manifest");
+          } finally {
+            values.recycle();
+          }
+        });
+    test(
         "Resources / layoutName / id",
         () ->
             require(
                 res.layout("normal_content") == R.layout.normal_content
                     && res.id("api_body") == R.id.api_body,
                 "real R ids"));
+    test(
+        "setContentView root margin / gravity",
+        () -> {
+          View root = res.requireView(getWindow().getDecorView(), "api_root", View.class);
+          require(root.getLayoutParams() instanceof FrameLayout.LayoutParams, "content params");
+          FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) root.getLayoutParams();
+          int margin = Math.round(4 * getResources().getDisplayMetrics().density);
+          require(
+              params.leftMargin == margin
+                  && params.topMargin == margin
+                  && params.rightMargin == margin
+                  && params.bottomMargin == margin
+                  && params.gravity == android.view.Gravity.CENTER,
+              "root params");
+        });
     test(
         "string / text / format",
         () ->
@@ -89,14 +118,16 @@ public final class NormalDemoActivity extends Activity {
           require(
               p.getChildCount() == 0
                   && v.getParent() == null
-                  && v.getLayoutParams() != null
+                  && v.getLayoutParams() instanceof LinearLayout.LayoutParams
                   && v.getLayoutParams().width == -1
                   && v.getLayoutParams().height
                       == Math.round(48 * getResources().getDisplayMetrics().density),
               "detached");
-          if (res.isSystemResources())
-            require(
-                v.getLayoutParams() instanceof LinearLayout.LayoutParams, "native parent params");
+          LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) v.getLayoutParams();
+          require(
+              params.leftMargin == Math.round(7 * getResources().getDisplayMetrics().density)
+                  && params.gravity == android.view.Gravity.CENTER,
+              "parent-aware margins/gravity");
         });
     test(
         "inflate attachToRoot",

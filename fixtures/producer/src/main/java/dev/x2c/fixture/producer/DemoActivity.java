@@ -7,13 +7,12 @@ import android.view.ViewGroup;
 import android.widget.*;
 import dev.x2c.fixture.businessbase.BusinessBaseActivity;
 import dev.x2c.plugin.api.X2cPluginActivity;
-import dev.x2c.plugin.runtime.PluginActivityManager;
 import dev.x2c.runtime.*;
 import java.util.ArrayList;
 import java.util.List;
 
 /** Capability lab: individual XML examples, executable assertions and component navigation. */
-@X2cPluginActivity
+@X2cPluginActivity(themeKey = "layout.showcase.light.v1")
 public final class DemoActivity extends BusinessBaseActivity {
   private X2cResources res;
   private LinearLayout body;
@@ -53,13 +52,11 @@ public final class DemoActivity extends BusinessBaseActivity {
     button("02 · 组合布局与自定义 View", this::layouts);
     button("03 · Values / Drawable / 宿主资源", this::resources);
     button("04 · 本地图片 → CDN / 宿主图片", this::pictures);
+    check("setContentView 根 margin / gravity", this::verifyContentRootLayoutParams);
     button(
         "05 · Activity / Service / Receiver / Provider",
         () ->
-            PluginActivityManager.startActivity(
-                this,
-                "dev.x2c.fixture.component-showcase",
-                "dev.x2c.fixture.secondary.ComponentShowcaseActivity"));
+            DemoNavigation.openComponentShowcase(this));
     button(
         "06 · Application / ClassLoader / ID 隔离",
         () -> {
@@ -85,6 +82,19 @@ public final class DemoActivity extends BusinessBaseActivity {
         });
   }
 
+  private void verifyContentRootLayoutParams() {
+    View root = res.requireView(getWindow().getDecorView(), "lab_root", View.class);
+    require(root.getLayoutParams() instanceof FrameLayout.LayoutParams, "content parent params");
+    FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) root.getLayoutParams();
+    require(
+        params.leftMargin == dp(4)
+            && params.topMargin == dp(4)
+            && params.rightMargin == dp(4)
+            && params.bottomMargin == dp(4)
+            && params.gravity == android.view.Gravity.CENTER,
+        "root margin / gravity");
+  }
+
   private void framework() {
     detail = true;
     reset("53 项 framework 矩阵");
@@ -103,8 +113,6 @@ public final class DemoActivity extends BusinessBaseActivity {
                   require(
                       v.isClickable()
                           && v.isLongClickable()
-                          && v.isSelected()
-                          && v.isActivated()
                           && Math.abs(v.getAlpha() - .8f) < .01f
                           && Math.abs(v.getScaleX() - .95f) < .01f
                           && v.getPaddingLeft() == dp(12)

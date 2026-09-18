@@ -3,8 +3,15 @@ plugins {
     `maven-publish`
 }
 
-group = "dev.x2c"
-version = "0.1.0-SNAPSHOT"
+val x2cVersion = rootProject.file("../VERSION").readText().trim()
+require(x2cVersion.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?"))) {
+    "Invalid X2C version in VERSION: $x2cVersion"
+}
+
+allprojects {
+    group = "dev.x2c"
+    version = x2cVersion
+}
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(17))

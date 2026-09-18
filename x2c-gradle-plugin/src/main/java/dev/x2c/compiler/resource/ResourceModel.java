@@ -230,6 +230,8 @@ final class LayoutNode {
     final Map<String, String> attributes = new TreeMap<>();
     final Map<String, CustomAttributeValue> customAttributes = new TreeMap<>();
     final Map<String, CustomAttributeValue> layoutAttributes = new TreeMap<>();
+    final Map<String, Map<String, CustomAttributeValue>> rootLayoutAttributesByParentClass =
+            new TreeMap<>();
     final List<LayoutNode> children = new ArrayList<>();
 
     LayoutNode(String tag, String javaType, CustomViewRegistry.ViewSpec customView) {
@@ -264,7 +266,9 @@ final class BitmapAsset {
 
 final class Model {
     final CustomViewRegistry customViews;
+    HostResourceDependencies hostResources;
     final int minApi;
+    final boolean pluginMode;
     final Map<String, String> strings = new TreeMap<>();
     final Map<String, Integer> colors = new TreeMap<>();
     final Map<String, ColorSelector> colorSelectors = new TreeMap<>();
@@ -290,11 +294,18 @@ final class Model {
     final Map<String, String> drawableKinds = new TreeMap<>();
     final Set<String> declaredDrawables = new TreeSet<>();
     final Map<String, List<String>> drawableDependencies = new TreeMap<>();
+    final Map<String, ResourceFile> layoutFiles = new TreeMap<>();
     final Map<String, LayoutNode> layouts = new TreeMap<>();
 
-    Model(CustomViewRegistry customViews, int minApi) {
+    Model(
+            CustomViewRegistry customViews,
+            HostResourceDependencies hostResources,
+            int minApi,
+            boolean pluginMode) {
         this.customViews = customViews;
+        this.hostResources = hostResources;
         this.minApi = minApi;
+        this.pluginMode = pluginMode;
     }
 }
 
@@ -317,6 +328,7 @@ final class Report {
     String generatedPackage;
     List<String> inputs;
     Map<String, Integer> counts;
+    Map<String, List<String>> inferredHostResources;
     List<String> invariants;
     List<String> frameworkViews;
     Map<String, String> frameworkViewGroups;

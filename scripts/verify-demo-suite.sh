@@ -2,8 +2,16 @@
 set -euo pipefail
 task_root=$(cd "$(dirname "$0")/.." && pwd)
 export JAVA_HOME="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
+task_runtime_abi=$(sed -n 's/.*CURRENT_RUNTIME_ABI = \([0-9][0-9]*\);/\1/p' \
+    "$task_root/x2c-plugin-api/src/main/java/dev/x2c/plugin/api/PluginActivityRegistry.java")
+if [[ -z "$task_runtime_abi" ]]; then
+    echo "Cannot determine the current plugin component runtime ABI" >&2
+    exit 1
+fi
 "$task_root/gradlew" -p "$task_root" :fixtures:consumer:assembleDebug --offline --configuration-cache
 task_apk="$task_root/fixtures/consumer/build/outputs/apk/debug/consumer-debug.apk"
+task_layout_component_report="$task_root/fixtures/producer/build/reports/x2c/release/activities.json"
+task_showcase_component_report="$task_root/fixtures/producer-secondary/build/reports/x2c/release/activities.json"
 task_tmp=$(mktemp -d)
 trap 'rm -rf "$task_tmp"' EXIT
 for task_payload in x2c-layout-showcase x2c-component-showcase; do
@@ -11,8 +19,14 @@ for task_payload in x2c-layout-showcase x2c-component-showcase; do
     [[ $(unzip -Z1 "$task_tmp/$task_payload.jar") == classes.dex ]]
     unzip -p "$task_tmp/$task_payload.jar" classes.dex | strings > "$task_tmp/$task_payload.classes"
     unzip -p "$task_apk" "assets/$task_payload/codegen-dex.descriptor" > "$task_tmp/$task_payload.descriptor"
-    [[ $(sed -n '5p' "$task_tmp/$task_payload.descriptor") == 2 ]]
+    task_payload_abi=$(sed -n '5p' "$task_tmp/$task_payload.descriptor")
+    if [[ "$task_payload_abi" != "$task_runtime_abi" ]]; then
+        echo "$task_payload ABI mismatch: payload=$task_payload_abi runtime=$task_runtime_abi" >&2
+        exit 1
+    fi
 done
+rg -q '"themeKey": "layout\.showcase\.light\.v1"' "$task_layout_component_report"
+rg -q '"themeKey": "video\.home\.light\.v1"' "$task_showcase_component_report"
 rg -q 'Ldev/x2c/fixture/producer/DemoActivity;' "$task_tmp/x2c-layout-showcase.classes"
 for task_type in VideoHomeActivity VideoDetailActivity ComponentShowcaseActivity ComponentProbeService ComponentProbeReceiver ComponentProbeProvider; do
     rg -q "Ldev/x2c/fixture/secondary/$task_type;" "$task_tmp/x2c-component-showcase.classes"

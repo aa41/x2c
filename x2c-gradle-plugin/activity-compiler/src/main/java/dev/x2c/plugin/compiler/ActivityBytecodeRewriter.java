@@ -14,7 +14,8 @@ import org.objectweb.asm.Opcodes;
 /** Rewrites Activity inheritance plus final-API call sites that Java dispatch cannot override. */
 final class ActivityBytecodeRewriter {
     private static final String ACTIVITY = "android/app/Activity";
-    private static final String PLUGIN_ACTIVITY = "dev/x2c/plugin/runtime/PluginActivity";
+    private static final String ACTIVITY_API_BRIDGE =
+            "dev/x2c/plugin/runtime/ActivityApiBridge";
     private static final String SERVICE = "android/app/Service";
     private static final String PLUGIN_SERVICE = "dev/x2c/plugin/runtime/PluginService";
     private static final String RECEIVER = "android/content/BroadcastReceiver";
@@ -61,25 +62,18 @@ final class ActivityBytecodeRewriter {
                             int opcode, String owner, String name, String descriptor,
                             boolean isInterface) {
                         String bridge = FINAL_API_BRIDGES.get(name + descriptor);
-                        boolean currentActivity = activityHierarchy.contains(className);
-                        boolean knownPluginReceiver = activityHierarchy.contains(owner)
-                                || (currentActivity && ACTIVITY.equals(owner));
-                        boolean ambiguousFrameworkActivityReceiver = ACTIVITY.equals(owner)
-                                && !currentActivity;
-                        if (bridge != null && ambiguousFrameworkActivityReceiver) {
-                            throw new IllegalStateException(
-                                    "Ambiguous final Activity API receiver in plugin bytecode: "
-                                            + name + descriptor + " from "
-                                            + className.replace('/', '.')
-                                            + ". Use a concrete plugin Activity/BaseActivity type "
-                                            + "or call the real container explicitly.");
-                        }
-                        if (bridge != null && knownPluginReceiver) {
+                        boolean possiblePluginActivityReceiver = ACTIVITY.equals(owner)
+                                || activityHierarchy.contains(owner);
+                        if (bridge != null && possiblePluginActivityReceiver) {
                             super.visitMethodInsn(
-                                    Opcodes.INVOKEVIRTUAL, PLUGIN_ACTIVITY, bridge, descriptor, false);
+                                    Opcodes.INVOKESTATIC,
+                                    ACTIVITY_API_BRIDGE,
+                                    bridge,
+                                    prependActivityReceiver(descriptor),
+                                    false);
                             return;
                         }
-                        if ((knownPluginReceiver || ambiguousFrameworkActivityReceiver)
+                        if (possiblePluginActivityReceiver
                                 && UNSUPPORTED_FINAL_APIS.contains(name + descriptor)) {
                             throw new IllegalStateException(
                                     "Unsupported final Activity API in plugin bytecode: "
@@ -164,39 +158,43 @@ final class ActivityBytecodeRewriter {
 
     private static Map<String, String> bridges() {
         Map<String, String> result = new HashMap<String, String>();
-        add(result, "getApplication", "()Landroid/app/Application;", "getPluginApplication");
-        add(result, "isChild", "()Z", "isPluginChild");
-        add(result, "getParent", "()Landroid/app/Activity;", "getPluginParent");
+        add(result, "getApplication", "()Landroid/app/Application;", "getApplication");
+        add(result, "isChild", "()Z", "isChild");
+        add(result, "getParent", "()Landroid/app/Activity;", "getParent");
         add(result, "managedQuery",
                 "(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;",
-                "pluginManagedQuery");
-        add(result, "setResult", "(I)V", "setPluginResult");
-        add(result, "setResult", "(ILandroid/content/Intent;)V", "setPluginResult");
-        add(result, "requestWindowFeature", "(I)Z", "requestPluginWindowFeature");
-        add(result, "getTitle", "()Ljava/lang/CharSequence;", "getPluginTitle");
-        add(result, "getTitleColor", "()I", "getPluginTitleColor");
-        add(result, "runOnUiThread", "(Ljava/lang/Runnable;)V", "runOnPluginUiThread");
-        add(result, "setVolumeControlStream", "(I)V", "setPluginVolumeControlStream");
-        add(result, "getVolumeControlStream", "()I", "getPluginVolumeControlStream");
+                "managedQuery");
+        add(result, "setResult", "(I)V", "setResult");
+        add(result, "setResult", "(ILandroid/content/Intent;)V", "setResult");
+        add(result, "requestWindowFeature", "(I)Z", "requestWindowFeature");
+        add(result, "getTitle", "()Ljava/lang/CharSequence;", "getTitle");
+        add(result, "getTitleColor", "()I", "getTitleColor");
+        add(result, "runOnUiThread", "(Ljava/lang/Runnable;)V", "runOnUiThread");
+        add(result, "setVolumeControlStream", "(I)V", "setVolumeControlStream");
+        add(result, "getVolumeControlStream", "()I", "getVolumeControlStream");
         add(result, "setMediaController", "(Landroid/media/session/MediaController;)V",
-                "setPluginMediaController");
+                "setMediaController");
         add(result, "getMediaController", "()Landroid/media/session/MediaController;",
-                "getPluginMediaController");
-        add(result, "requestPermissions", "([Ljava/lang/String;I)V", "requestPluginPermissions");
-        add(result, "requireViewById", "(I)Landroid/view/View;", "requirePluginViewById");
-        add(result, "setDefaultKeyMode", "(I)V", "setPluginDefaultKeyMode");
-        add(result, "setFeatureDrawableResource", "(II)V", "setPluginFeatureDrawableResource");
-        add(result, "setFeatureDrawableUri", "(ILandroid/net/Uri;)V", "setPluginFeatureDrawableUri");
+                "getMediaController");
+        add(result, "requestPermissions", "([Ljava/lang/String;I)V", "requestPermissions");
+        add(result, "requireViewById", "(I)Landroid/view/View;", "requireViewById");
+        add(result, "setDefaultKeyMode", "(I)V", "setDefaultKeyMode");
+        add(result, "setFeatureDrawableResource", "(II)V", "setFeatureDrawableResource");
+        add(result, "setFeatureDrawableUri", "(ILandroid/net/Uri;)V", "setFeatureDrawableUri");
         add(result, "setFeatureDrawable", "(ILandroid/graphics/drawable/Drawable;)V",
-                "setPluginFeatureDrawable");
-        add(result, "setFeatureDrawableAlpha", "(II)V", "setPluginFeatureDrawableAlpha");
-        add(result, "setProgressBarVisibility", "(Z)V", "setPluginProgressBarVisibility");
+                "setFeatureDrawable");
+        add(result, "setFeatureDrawableAlpha", "(II)V", "setFeatureDrawableAlpha");
+        add(result, "setProgressBarVisibility", "(Z)V", "setProgressBarVisibility");
         add(result, "setProgressBarIndeterminateVisibility", "(Z)V",
-                "setPluginProgressBarIndeterminateVisibility");
-        add(result, "setProgressBarIndeterminate", "(Z)V", "setPluginProgressBarIndeterminate");
-        add(result, "setProgress", "(I)V", "setPluginProgress");
-        add(result, "setSecondaryProgress", "(I)V", "setPluginSecondaryProgress");
+                "setProgressBarIndeterminateVisibility");
+        add(result, "setProgressBarIndeterminate", "(Z)V", "setProgressBarIndeterminate");
+        add(result, "setProgress", "(I)V", "setProgress");
+        add(result, "setSecondaryProgress", "(I)V", "setSecondaryProgress");
         return Collections.unmodifiableMap(result);
+    }
+
+    private static String prependActivityReceiver(String descriptor) {
+        return "(Landroid/app/Activity;" + descriptor.substring(1);
     }
 
     private static Set<String> unsupportedFinalApis() {

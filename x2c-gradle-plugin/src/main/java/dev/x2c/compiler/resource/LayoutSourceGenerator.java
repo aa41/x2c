@@ -31,8 +31,13 @@ final class LayoutSourceGenerator {
         for (Map.Entry<String, LayoutNode> item : model.layouts.entrySet()) {
             out.blank();
             out.open("public static View " + javaName(item.getKey()) + "(Context context)");
+            out.line("return " + javaName(item.getKey()) + "(context, null);");
+            out.close();
+            out.blank();
+            out.open("public static View " + javaName(item.getKey())
+                    + "(Context context, ViewGroup parent)");
             LayoutEmitter emitter = new LayoutEmitter(out, model, pluginMode);
-            String root = emitter.emit(item.getValue(), null, null);
+            String root = emitter.emitRoot(item.getValue(), "parent");
             out.line("return " + root + ";");
             out.close();
         }

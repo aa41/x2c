@@ -42,12 +42,14 @@ public final class X2C {
 
     /** Initializes the host context and the ClassLoader used as the plugin fallback. */
     public static void init(Context context) {
-        Objects.requireNonNull(context, "context");
-        Context candidate = context instanceof Application ? context : applicationContext(context);
-        if (!(candidate instanceof Application)) {
-            throw new IllegalStateException("Initialize X2C with the real host Application after it is ready");
-        }
-        init((Application) candidate, candidate.getClassLoader());
+        Application application = requireApplication(context);
+        init(application, application.getClassLoader());
+    }
+
+    /** Initializes X2C and publishes the immutable host-owned plugin Activity theme table. */
+    public static void init(Context context, PluginHostConfig pluginHostConfig) {
+        Application application = requireApplication(context);
+        init(application, application.getClassLoader(), pluginHostConfig);
     }
 
     /** Explicit binding for hosts whose protection SDK supplies a stable delegating loader. */
@@ -71,6 +73,14 @@ public final class X2C {
             // Publish last: readers that observe this volatile write also observe the host fields.
             applicationContext = candidate;
         }
+    }
+
+    /** Explicit stable-loader binding with host-owned plugin Activity themes. */
+    public static void init(
+            Application candidate, ClassLoader loader, PluginHostConfig pluginHostConfig) {
+        Objects.requireNonNull(pluginHostConfig, "pluginHostConfig");
+        init(candidate, loader);
+        PluginThemeRegistry.initialize(candidate, pluginHostConfig);
     }
 
     /** The single real Application shared by host and all JAR plugins. */
@@ -445,7 +455,7 @@ public final class X2C {
 
     public static void setContentView(Activity activity, int layoutId) {
         Objects.requireNonNull(activity, "activity");
-        activity.setContentView(getView(activity, layoutId));
+        setGeneratedContentView(activity, requireLayout(layoutId));
     }
 
     /**
@@ -460,12 +470,30 @@ public final class X2C {
 
     public static void setContentView(Activity activity, String moduleName, String layoutName) {
         Objects.requireNonNull(activity, "activity");
-        activity.setContentView(getView(activity, moduleName, layoutName));
+        setGeneratedContentView(
+                activity, requireNamedLayout(activity, moduleName, layoutName));
     }
 
     public static void setContentView(Activity activity, String moduleName, int layoutId) {
         Objects.requireNonNull(activity, "activity");
-        activity.setContentView(getView(activity, moduleName, layoutId));
+        setGeneratedContentView(
+                activity, requireModuleLayout(activity, moduleName, layoutId));
+    }
+
+    private static void setGeneratedContentView(
+            Activity activity, RegisteredLayout registered) {
+        View contentRoot = activity.getWindow().getDecorView().findViewById(android.R.id.content);
+        if (!(contentRoot instanceof ViewGroup)) {
+            throw new IllegalStateException(
+                    "Activity window has no ViewGroup with android.R.id.content");
+        }
+        View view = createView(activity, registered, (ViewGroup) contentRoot);
+        ViewGroup.LayoutParams params = view.getLayoutParams();
+        if (params == null) {
+            activity.setContentView(view);
+        } else {
+            activity.setContentView(view, params);
+        }
     }
 
     public static View inflate(Context context, int layoutId, ViewGroup parent) {
@@ -477,7 +505,7 @@ public final class X2C {
         if (attachToRoot && parent == null) {
             throw new IllegalArgumentException("attachToRoot requires a non-null parent");
         }
-        View view = getView(context, layoutId);
+        View view = createView(context, requireLayout(layoutId), parent);
         return attach(view, parent, attachToRoot);
     }
 
@@ -491,7 +519,8 @@ public final class X2C {
         if (attachToRoot && parent == null) {
             throw new IllegalArgumentException("attachToRoot requires a non-null parent");
         }
-        View view = getView(context, moduleName, layoutName);
+        View view = createView(
+                context, requireNamedLayout(context, moduleName, layoutName), parent);
         return attach(view, parent, attachToRoot);
     }
 
@@ -510,7 +539,10 @@ public final class X2C {
         if (attachToRoot && parent == null) {
             throw new IllegalArgumentException("attachToRoot requires a non-null parent");
         }
-        return attach(getView(context, moduleName, layoutId), parent, attachToRoot);
+        return attach(
+                createView(context, requireModuleLayout(context, moduleName, layoutId), parent),
+                parent,
+                attachToRoot);
     }
 
     public static View inflate(
@@ -521,9 +553,11 @@ public final class X2C {
     private static View attach(View view, ViewGroup parent, boolean attachToRoot) {
         if (parent != null && attachToRoot) {
             ViewGroup.LayoutParams params = view.getLayoutParams();
-            int width = params == null ? ViewGroup.LayoutParams.WRAP_CONTENT : params.width;
-            int height = params == null ? ViewGroup.LayoutParams.WRAP_CONTENT : params.height;
-            parent.addView(view, width, height);
+            if (params == null) {
+                parent.addView(view);
+            } else {
+                parent.addView(view, params);
+            }
         }
         return view;
     }
@@ -541,6 +575,10 @@ public final class X2C {
 
     public static View getView(Context context, int layoutId) {
         Objects.requireNonNull(context, "context");
+        return requireLayout(layoutId).factory.create(context);
+    }
+
+    private static RegisteredLayout requireLayout(int layoutId) {
         Map<String, RegisteredLayout> modules;
         synchronized (LOCK) {
             Map<String, RegisteredLayout> registered = LAYOUTS.get(layoutId);
@@ -558,11 +596,16 @@ public final class X2C {
                             + "Use the module-name X2C overload.",
                     layoutId, modules.keySet()));
         }
-        return modules.values().iterator().next().factory.create(context);
+        return modules.values().iterator().next();
     }
 
     public static View getView(Context context, String moduleName, String layoutName) {
         Objects.requireNonNull(context, "context");
+        return requireNamedLayout(context, moduleName, layoutName).factory.create(context);
+    }
+
+    private static RegisteredLayout requireNamedLayout(
+            Context context, String moduleName, String layoutName) {
         Objects.requireNonNull(moduleName, "moduleName");
         Objects.requireNonNull(layoutName, "layoutName");
         ensureModuleInitialized(context, moduleName);
@@ -575,11 +618,16 @@ public final class X2C {
                     "Unknown generated layout @" + moduleName + ":layout/" + layoutName
                             + ". Initialize its generated X2cModule first.");
         }
-        return registered.factory.create(context);
+        return registered;
     }
 
     public static View getView(Context context, String moduleName, int layoutId) {
         Objects.requireNonNull(context, "context");
+        return requireModuleLayout(context, moduleName, layoutId).factory.create(context);
+    }
+
+    private static RegisteredLayout requireModuleLayout(
+            Context context, String moduleName, int layoutId) {
         Objects.requireNonNull(moduleName, "moduleName");
         ensureModuleInitialized(context, moduleName);
         RegisteredLayout registered;
@@ -591,7 +639,16 @@ public final class X2C {
             throw new IllegalArgumentException(String.format(
                     "Unknown generated layout 0x%08X in module %s", layoutId, moduleName));
         }
-        return registered.factory.create(context);
+        return registered;
+    }
+
+    private static View createView(
+            Context context, RegisteredLayout registered, ViewGroup parent) {
+        LayoutFactory factory = registered.factory;
+        if (factory instanceof ParentAwareLayoutFactory) {
+            return ((ParentAwareLayoutFactory) factory).create(context, parent);
+        }
+        return factory.create(context);
     }
 
     private static void ensureModuleInitialized(Context context, String moduleName) {
@@ -614,6 +671,16 @@ public final class X2C {
         if (context instanceof Application) return context;
         Context application = context.getApplicationContext();
         return application == null ? context : application;
+    }
+
+    private static Application requireApplication(Context context) {
+        Objects.requireNonNull(context, "context");
+        Context candidate = context instanceof Application ? context : applicationContext(context);
+        if (!(candidate instanceof Application)) {
+            throw new IllegalStateException(
+                    "Initialize X2C with the real host Application after it is ready");
+        }
+        return (Application) candidate;
     }
 
     private static void requireSameHost(String packageName) {

@@ -17,6 +17,7 @@ import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.compile.JavaCompile;
 
@@ -123,7 +124,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                         task.getModuleNamespace().set(androidNamespace(android, variant));
                         task.getVariantName().set(variant.getName());
                         task.getMinApi().set(extension.getMinApi());
-                        task.getPluginMode().set(extension.getPluginMode().orElse(extension.getX2cEnable()));
+                        task.getPluginMode().set(pluginModeProvider(project, extension));
                         task.getOutputDirectory().set(generatedJavaDirectory);
                         task.getReportDirectory().set(new File(
                                 project.getBuildDir(), "reports/x2c/" + variant.getName()));
@@ -158,7 +159,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                     public void execute(PackageCodegenJarTask task) {
                         task.setGroup("x2c");
                         task.setDescription("Creates a deterministic class-only JAR for " + variant.getName());
-                        task.getPluginMode().set(extension.getPluginMode().orElse(extension.getX2cEnable()));
+                        task.getPluginMode().set(pluginModeProvider(project, extension));
                         task.dependsOn(variant.getJavaCompileProvider());
                         task.getInputDirectories().from(project.provider(new java.util.concurrent.Callable<File>() {
                             @Override
@@ -189,7 +190,7 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                                 d8Executable.getParentFile(), "lib/d8.jar"));
                         task.getBootClasspath().from(android.getBootClasspath());
                         task.getMinApi().set(extension.getMinApi());
-                        task.getPluginMode().set(extension.getPluginMode().orElse(extension.getX2cEnable()));
+                        task.getPluginMode().set(pluginModeProvider(project, extension));
                         task.getOutputJar().set(new File(
                                 project.getBuildDir(), "outputs/x2c/" + variant.getName() + "/codegen-dex.jar"));
                     }
@@ -223,6 +224,14 @@ public final class X2cCodegenPlugin implements Plugin<Project> {
                 });
             }
         });
+    }
+
+    /** Gradle 5.4 has Property#set(Provider), but not Provider#orElse(Provider). */
+    private static Provider<Boolean> pluginModeProvider(
+            Project project, X2cExtension extension) {
+        return project.provider(() -> extension.getPluginMode().isPresent()
+                ? extension.getPluginMode().get()
+                : extension.getX2cEnable().get());
     }
 
     private static void includeOptionalJvmCompilerOutputs(

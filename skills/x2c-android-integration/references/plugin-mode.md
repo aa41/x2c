@@ -13,11 +13,14 @@ is a DEX JAR without Android resources, assets, JNI, or Manifest components.
 3. Use `compileOnly` for `x2c-runtime`, `x2c-plugin-runtime`, `x2c-plugin-base`, and the annotation
    API visible to source. The payload must not contain those host-owned classes.
 4. Keep the plugin Manifest free of business Activity, Service, Receiver, and Provider declarations.
-   The host runtime AAR contributes fixed non-exported containers.
+   The host runtime AAR contributes fixed non-exported containers. Plugin Activity themes never
+   come from a plugin Manifest; only `@X2cPluginActivity.themeKey` selects a host-registered style.
 5. Mark only concrete plugin component entries:
 
    ```java
-   @X2cPluginActivity(launchMode = PluginLaunchMode.SINGLE_TOP)
+   @X2cPluginActivity(
+           launchMode = PluginLaunchMode.SINGLE_TOP,
+           themeKey = "commerce.detail.light.v1")
    public final class DetailActivity extends Activity { }
 
    @X2cPluginService
@@ -53,8 +56,9 @@ is a DEX JAR without Android resources, assets, JNI, or Manifest components.
 - Plugin-declared supported values/drawables are plugin-first. A supported value/drawable name not
   declared by the plugin may fall back to the host through explicit `X2cResources` lookup.
 - `id` and `layout` remain plugin synthetic identities and never fall back to host IDs.
-- Plugin XML/generated drawable references must resolve inside the plugin model. Host fallback is
-  not an excuse for undeclared XML references.
+- Plugin layout XML automatically infers unresolved string/color/bool/integer/dimen/drawable names
+  as host dependencies. Generated drawable references must still resolve inside the plugin model.
+  Module initialization fails before registration when the installed host lacks an inferred name.
 - Plugin bitmaps become HTTPS metadata. Upload outside Gradle, content-address by SHA-256, and commit
   the immutable `x2c-assets.lock.json`. The host installs one verified image loader. A host-only
   local drawable may be requested by name, but a plugin bitmap of the same name wins.
@@ -67,8 +71,26 @@ is a DEX JAR without Android resources, assets, JNI, or Manifest components.
    runtime, plugin API, plugin base, loader, and plugin runtime. Direct `implementation`
    declarations are easiest to audit; plugin API may also arrive transitively through plugin
    base/runtime. The host may implement shared business APIs used through ClassLoader fallback.
-2. Initialize `X2C` once in the real `Application`, after hardening/proxy ClassLoader setup is
-   stable. Install the image loader before plugin UI requests images.
+2. Initialize the plugin runtime once in the real `Application`, after hardening/proxy ClassLoader
+   setup is stable. The host owns an immutable theme-key table; plugin code never embeds host style
+   IDs:
+
+   ```java
+   X2C.init(
+           this,
+           PluginHostConfig.builder()
+                   .defaultActivityTheme(R.style.HostPluginDefault)
+                   .activityTheme("commerce.detail.light.v1", R.style.HostPluginCommerceDetail)
+                   .activityTheme("video.home.dark.v1", "HostPluginVideoDark")
+                   .build());
+   ```
+
+   Prefer direct `R.style` IDs. The string overload resolves a local host style once with
+   `getIdentifier`; keep name-only styles with a static reference or `tools:keep` when shrinking.
+   Missing keys and structurally incompatible translucent/floating/NoDisplay/ActionBar themes fail
+   before Activity launch. Host themes should inherit `X2cPluginContainer.Opaque`, with the same
+   window structure in every qualifier variant. Install the image loader before plugin UI requests
+   images.
 3. Verify the signed descriptor and payload with `SignedPluginInstaller` before creating the
    `PluginClassLoader`. Production private keys belong in an external publisher/CI signer; the APK
    pins public keys only.
@@ -120,8 +142,11 @@ arbitrary class name from untrusted metadata is not a safe discovery mechanism.
 ## Required build result
 
 - `report.json` mode is `PLUGIN_SYNTHETIC_IDS`.
+- `report.json` records exact `inferredHostResources` and the
+  `host-resource-dependencies=inferred-and-preflighted` invariant. Generated module initialization
+  verifies every inferred host name/type before publishing its layouts.
 - `activities.json` contains the expected registry, ABI, dependencies, and every annotated
-  component.
+  component, including each Activity `themeKey`.
 - `codegen.jar` and `activity-plugin.jar` contain classes only.
 - `codegen-dex.jar` contains a valid `classes.dex` and no runtime or resource payload.
 - A cold host process verifies, installs, loads, registers, and launches the plugin. Upgrade and

@@ -2,9 +2,9 @@
 
 > 文档状态：As-built architecture + production roadmap
 >
-> 基线版本：`0.1.0-SNAPSHOT`
+> 基线版本：`0.2.0-SNAPSHOT`
 >
-> 更新日期：2026-09-08
+> 更新日期：2026-09-16
 
 本文描述当前仓库已经实现的资源转 class、双模式构建、动态 DEX JAR、安全安装、ClassLoader、Android 四大组件代理与示例验证架构。标记为“规划”的内容尚未实现，不能作为当前运行时承诺。
 
@@ -181,7 +181,7 @@ normal 模式保留 AGP/AAPT2 资源流水线：
 | orchestration | `ResourceCompilationEngine` | 只控制扫描、解析、校验、生成、报告顺序 |
 | discovery/model | `ResourceScanner`、`ResourceModel`、`ResourceSymbols`、`SyntheticIdAllocator` | 确定性输入、符号全集与稳定 ID |
 | parser | `ValuesResourceParser`、`ColorResourceParser`、`DrawableResourceParser`、`LayoutResourceParser` | XML 到 model，不直接生成源码 |
-| registry | `FrameworkViewRegistry`、`CustomViewRegistry` | View、属性、构造器与 LayoutParams contract 单一事实源 |
+| registry | `FrameworkViewRegistry`、`CustomViewRegistry`、`HostResourceDependencies` | View、属性、构造器、LayoutParams 与推断宿主资源 contract 单一事实源 |
 | generator | `*SourceGenerator`、`LayoutEmitter` | model 到 Java，不重新读取 XML |
 | infrastructure | `XmlSupport`、`ResourceValueParser`、`JavaExpressions`、`FileSupport` | 安全 XML、typed value、Java 表达式与摘要 |
 | report/lock | `CompilationReportWriter`、`AssetLockVerifier` | 报告与不可变 bitmap metadata 边界 |
@@ -223,9 +223,10 @@ drawable 才查询宿主 `Resources`。宿主 `getIdentifier` 的成功与失败
 资源的 identifier 也保持 synthetic，只有插件未声明的受支持宿主资源返回真实宿主 ID。动态 feature 安装后
 可调用 `X2C.invalidatePluginResourceCaches()` 清除名称查询缓存。
 
-宿主兜底当前只接受插件业务经 `X2cResources` 发起的显式名称查询。插件 XML 与 generated drawable 的资源
-依赖仍由编译器闭包校验，必须在插件内声明；这样未知引用和拼写错误继续在构建期失败，不会隐式绑定到某个
-宿主版本。未来若允许 XML 引用宿主资源，应增加显式语法/contract，而不是放宽现有未知引用检查。
+宿主兜底接受插件业务经 `X2cResources` 发起的显式名称查询。plugin mode 的 layout XML 会把本地不存在的
+string/color/bool/integer/dimen/drawable 自动记录为宿主依赖；`report.json.inferredHostResources` 是生成代码
+实际使用的精确合同。模块初始化会先解析全部依赖，全部存在后才发布 provider/layout。normal mode 不启用推断，
+generated drawable 也必须完全在插件资源模型内闭合。
 
 ### 5.4 多 layout 与 inflate
 
@@ -235,6 +236,21 @@ drawable 才查询宿主 `Resources`。宿主 `getIdentifier` 的成功与失败
 - `getView(Context, layoutName)`；
 - `inflate(Context, layoutName, parent)`；
 - `inflate(Context, layoutName, parent, attachToRoot)`。
+
+本地 `<include layout="@layout/name">` 在编译期展开并检测循环。规则与 `LayoutInflater` 对齐：include 的
+`id`/`visibility` 覆盖根 View；只有同时给出 width/height 时才整组采用 include-site LayoutParams，否则
+整组保留被包含根节点参数；普通 View 属性不会被 include 覆盖。所有 include-site 属性仍会按 included
+root 和真实 parent contract 校验，未知属性、错误 namespace 和拼写错误会在构建期失败。`<merge>` 仍只由关闭代码生成后的原生
+LayoutInflater 路径支持。
+
+新生成模块使用 `ParentAwareLayoutFactory`，`inflate(..., parent, ...)` 会按真实 parent 创建根
+LayoutParams；framework 容器矩阵和 `customViewsFile` 中声明的 container contract 均可参与分派，根节点的
+margin、gravity、weight、RelativeLayout/GridLayout 规则及自定义 `app:layout_*` 都会保留。旧生成模块仍只
+实现 `LayoutFactory.create(Context)`，runtime 会自动走兼容路径，不要求历史插件重新打包。未知自定义 parent
+在只有 width/height 时退回通用 LayoutParams；存在父专属属性时明确失败并要求声明 container contract，避免
+静默丢失布局语义。generated `X2C.setContentView()` 会把 Activity 的真实 `android.R.id.content` 作为
+parent，并使用生成出的 LayoutParams 调用两参数 `Activity.setContentView`；因此 Activity 根节点的 margin 与
+gravity 同样按 `FrameLayout.LayoutParams` 生效。system resources 路径继续交给 Android 原生 inflate。
 
 生成器遵循 Android inflate 的关键结构顺序：
 
@@ -269,7 +285,8 @@ framework 静态 child 容器包括：
 - content description、tag、tooltip、transition；
 - alpha、elevation、rotation、scale、translation、min size；
 - layout direction、over-scroll 和常用 accessibility 属性；
-- TextView/ImageView/CompoundButton/ProgressBar/SeekBar/RatingBar 常用 typed setter。
+- TextView/ImageView/CompoundButton/ProgressBar/SeekBar/RatingBar 常用 typed setter；TextView 覆盖
+  compound drawable 和 drawable padding。
 
 ### 5.6 自定义 View contract
 
@@ -277,6 +294,7 @@ framework 静态 child 容器包括：
 
 - 构造策略：`CONTEXT`、`CONTEXT_ATTRS`、`CONTEXT_ATTRS_DEF_STYLE`；
 - `<view class="...">` 和全限定 tag；
+- 可选 `frameworkBase` 复用已支持 framework View 的公共属性校验和 setter，同时仍构造原自定义类；
 - 属性通过类型化 setter 或 public field；
 - ViewGroup 可声明 container、自定义 LayoutParams、静态 factory；
 - 支持 `MarginLayoutParams`、父专属 `layout_*` setter/field；
@@ -294,7 +312,7 @@ framework 静态 child 容器包括：
 - composition：selector、layer-list、inset、clip、scale、rotate、level-list；
 - drawable 引用执行未知引用、循环依赖和异步 bitmap 混用检查。
 
-当前 plugin 模式明确拒绝 qualifier、style/theme/styleable、vector、ripple、nine-patch、animated drawable、include/merge、Data/View Binding 和 AAPT2 overlay。插件业务可通过 `X2cResources` 按名称查询插件资源，或在插件未声明同名资源时查询受支持的宿主 value/drawable；这不等价于完整 Android resource overlay。
+当前 plugin 模式明确拒绝插件自带的 qualifier、style/theme/styleable、vector、ripple、nine-patch、animated drawable、`<merge>`、Data/View Binding 和 AAPT2 overlay。插件业务可通过 `X2cResources` 按名称查询插件资源，或在插件未声明同名资源时查询受支持的宿主 value/drawable；这不等价于完整 Android resource overlay。Activity 的 `themeKey` 只选择宿主预埋真实 style，不会把插件 style XML 编译成 class。
 
 ### 5.8 图片模型
 
@@ -325,10 +343,28 @@ normal 模式保留 bitmap，由宿主 `Resources` 同步解析为 Drawable。�
 宿主在真实 `Application.onCreate` 或加固 SDK 确认环境准备完成后调用一次：
 
 ```java
-X2C.init(this);
+X2C.init(
+        this,
+        PluginHostConfig.builder()
+                .defaultActivityTheme(R.style.HostPluginDefault)
+                .activityTheme("commerce.detail.light.v1", R.style.HostPluginCommerceDetail)
+                .build());
 ```
 
-`X2C` 保存 application Context、宿主 package name 和宿主 ClassLoader，并通过 volatile 快路径与同步锁保证只发布一次。loader、generated module、组件或资源访问只调用 `requireInitialized`，不会重复绑定 Context。
+`X2C.init` 同时发布基础宿主状态和不可变的 Activity 主题表。直接 ID 会校验为真实 style；名称只在
+首次初始化时通过宿主 package 的 `Resources.getIdentifier` 解析一次。插件 metadata 只携带稳定
+`themeKey`，安装时验证全部 key，启动时容器在 delegate `onCreate` 前应用对应宿主主题。`X2C` 保存
+application Context、宿主 package name 和宿主 ClassLoader，并通过 volatile 快路径与同步锁保证只发布一次。
+loader、generated module、组件或资源访问只调用 `requireInitialized`，不会重复绑定 Context。normal AAR
+模式不启用组件主题协议，仍单独调用 `X2C.init(...)`。
+
+| Activity 创建模式 | 主题来源 | 明确不生效的来源 |
+|---|---|---|
+| normal AAR 原生组件 | 合并后 Manifest 的 Activity `android:theme`；缺省时继承 application theme | `@X2cPluginActivity.themeKey` |
+| 动态插件 delegate | `themeKey` -> 宿主不可变 `PluginHostConfig` | 插件 Manifest Activity/theme |
+
+一个宿主同时承载两种模式时也不会交叉覆盖：宿主可以为动态插件初始化主题表，但原生 normal Activity
+仍由 Android framework 按最终 merged Manifest 选择主题。
 
 ### 6.2 Descriptor 与安全安装
 
@@ -558,7 +594,10 @@ Plugin → HostFacade / HostServices → host internal implementation
 - 插件声明最低/最高宿主或 facade API 版本；
 - 服务端过滤后，客户端安装前再次校验。
 
-R8 无法看到服务端后发插件的引用。只配置 `-dontobfuscate` 不能防止 shrink，必须 keep 插件依赖的类和成员。第一阶段可以全量 keep 宿主以降低集成风险，稳定后应收敛到 facade/DTO 包的精确 keep。
+R8 无法看到服务端后发插件的引用。只配置 `-dontobfuscate` 不能防止 shrink，必须 keep 插件依赖的类和成员。
+`x2c-plugin-runtime` AAR 自带 consumer rules，保留 X2C runtime/API/base 的动态二进制协议；插件直接调用的
+宿主业务类不在 SDK 的控制范围内，仍由宿主提供 keep。第一阶段可以全量 keep 宿主以降低集成风险，稳定后
+应收敛到 facade/DTO 包的精确 keep。
 
 ## 11. 安全模型
 
@@ -685,12 +724,12 @@ bash ./scripts/verify-plugin-showcases.sh
 
 当前自动化覆盖：
 
-- 38 项 resource compiler self-test；
+- 51 项 resource compiler self-test；
 - synthetic R2、normal host ID、多个 layout；
 - View/ViewGroup/LayoutParams/custom view contract；
 - values/color/shape/selector/composite drawable；
 - bitmap lock、CDN metadata 和 normal local drawable；
-- Activity 基类转换、compileOnly 最小闭包、host fallback；
+- Activity 基类转换、Java 8 匿名/局部类结构闭包、compileOnly 最小闭包、host fallback；
 - 组件 direct registry、slot 上限和不安全 API 拒绝；
 - descriptor 签名 canonical bytes、loader 和 runtime core；
 - class-only JAR、DEX-only JAR、consumer APK、normal AAR；
@@ -709,7 +748,7 @@ bash ./scripts/verify-plugin-showcases.sh
 
 ### P1：资源与 UI
 
-- 明确评估 include/merge、vector/ripple/nine-patch；
+- 评估 `<merge>`、vector/ripple/nine-patch，并继续扩充 include 差分用例；
 - 增加标准 inflater 差分测试；
 - 生产级 Coil/Glide adapter、磁盘缓存、离线占位和证书策略；
 - AndroidX/Fragment/AppCompat 以独立适配层进入，不污染原生基线。

@@ -59,8 +59,9 @@ without an anchor is not evidence of plugin ownership.
 ### Host-only resource is not found
 
 Only supported value/drawable types use plugin-to-host fallback, and lookup uses the host package.
-Check the exact name/type, host APK resource table, shrinker removal, and `tools:keep`. Plugin XML
-cannot reference an undeclared host-only name; fallback is an explicit business API path.
+Check the exact name/type, host APK resource table, shrinker removal, and `tools:keep`. A layout XML
+reference is inferred automatically in plugin mode. Inspect `report.json.inferredHostResources` to
+audit the exact host contract. Normal mode does not infer missing layout resources.
 
 ### `ClassNotFoundException`, `NoClassDefFoundError`, or `NoSuchMethodError`
 
@@ -81,6 +82,23 @@ The business object is a delegate attached to a real host container. Check the d
 API, lifecycle `super` chain, constructor/field initializer access to Context, and any SDK that
 requires exact Activity identity. Move identity-sensitive integration to a host adapter. Do not cast
 the delegate/context into an unrelated host Activity.
+
+### Normal Activity uses the wrong theme
+
+Inspect the final merged host Manifest, not the library source Manifest alone. Android applies the
+Activity declaration's `android:theme`; only an Activity without that attribute inherits the
+application theme. Check flavor/source-set selection and higher-priority manifest overrides.
+`@X2cPluginActivity.themeKey` and `PluginHostConfig` do not participate in native normal Activity
+creation, even when the same host APK also loads dynamic plugins.
+
+### Plugin Activity theme is missing or rejected
+
+Inspect `activities.json` for the exact `themeKey`, then inspect the one process-wide
+`PluginHostConfig` built before plugin installation. Plugin Manifest theme declarations are
+intentionally ignored and business component declarations there are rejected. For a non-empty key,
+register an exact host mapping; for an empty key, register a default theme. A name-based style must
+exist in the host package and survive shrinking. Translucent, floating, NoDisplay, ActionBar, or
+qualifier variants that change the fixed container window structure fail closed.
 
 ### Process death loses navigation/state
 

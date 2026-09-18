@@ -10,7 +10,7 @@ import dev.x2c.plugin.base.BasePluginActivity;
 import dev.x2c.runtime.X2C;
 import dev.x2c.runtime.X2cResources;
 
-@X2cPluginActivity
+@X2cPluginActivity(themeKey = "video.home.light.v1")
 public final class VideoDetailActivity extends BasePluginActivity {
   private VideoView player;
   private LinearLayout body;

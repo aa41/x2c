@@ -97,7 +97,7 @@ codegen.jar
 | plugin 位图异步 CDN | 支持 lock + SPI | 原始文件不进 JAR；宿主 loader 校验 HTTPS/MIME/bytes/SHA-256/尺寸并处理取消、重绑、缓存与错误 |
 | normal AAR 本地位图 | 支持宿主 Resources | 不要求 lock、不生成 CDN helper，位图保留在 AAR 并使用最终 drawable ID |
 | locale/night/density 等 qualifier | 拒绝 | 需要复现 Android best-match 与 configuration change |
-| theme/style/styleable/Material | 拒绝 | 依赖 `Resources.Theme`/`TypedArray`/默认 style 语义 |
+| 插件自带 theme/style/styleable/Material | 拒绝 | 依赖 `Resources.Theme`/`TypedArray`/默认 style 语义；Activity 仅支持通过 `themeKey` 选择宿主预埋真实 style |
 | vector/ripple/nine-patch/animated drawable | 拒绝 | 仍需 path/theme/state animation 专用编译器或资源表 |
 | public `R`、overlay、动态资源名 | 拒绝 | JAR 无 resource table 和 final-link ID |
 | Manifest component/system resource | 拒绝 | JAR 不参与 manifest/resource merge |

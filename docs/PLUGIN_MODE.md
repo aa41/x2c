@@ -75,7 +75,10 @@ x2c {
   ID 关系；它不是 `resources.arsc` 条目，禁止传给宿主 `Resources` API。
 - 宿主兜底仅用于业务代码通过 `X2cResources` 显式查询的宿主独有名称；插件 XML/generated drawable 的引用
   仍必须由插件声明，未知名称保持构建期失败。
-- 宿主只在 `Application` 初始化一次 `X2C.init(applicationContext)`，验签并创建 ClassLoader 后调用：
+- 宿主只在真实 `Application` 初始化一次
+  `X2C.init(application, PluginHostConfig)`。插件 Activity 通过 `themeKey` 选择宿主预注册的
+  真实 `R.style`；字符串 style name 只在初始化时经 `getIdentifier` 解析一次。完成初始化、验签并创建
+  ClassLoader 后调用：
 
 ```java
 PluginComponentRegistry registry =
@@ -100,6 +103,9 @@ unzip -l library/build/outputs/x2c/release/codegen-dex.jar
 - 原始 `res/`、位图和正常 Android Manifest 必须保留并合并到宿主。
 - library 使用 `api` 或 `implementation` 依赖 `x2c-runtime`，由 application ClassLoader 正常加载。
 - Activity、Service、Receiver、Provider 由 Android framework 按 Manifest 原生创建，不执行插件组件 superclass transform。
+- Activity 主题只遵循合并后的原生 Manifest：Activity 自身的 `android:theme` 优先，未声明时才继承
+  application theme。源码中即使保留 `@X2cPluginActivity(themeKey=...)`，normal 模式也不会读取或应用
+  `themeKey`，也不需要 `PluginHostConfig`。
 - `R2` 是无状态查询 facade，通过模块 Provider/宿主 `Resources` 解析最终资源 ID；没有 `R2.init()`。
 - 不安装 plugin-first wrapper，也不执行插件/宿主资源分派逻辑；资源行为完全由标准 AAR 合并后的
   Android `Resources` 决定。
@@ -126,6 +132,7 @@ unzip -l library/build/outputs/aar/library-release.aar
 | runtime/base 依赖 | `compileOnly`，宿主持有 | `api`/`implementation` |
 | 业务组件 Manifest | 不声明 | 正常声明 |
 | 组件 annotation/transform | 使用 | 不执行 transform |
+| Activity 主题来源 | `themeKey` -> 宿主不可变主题表 | 合并后的 Manifest `android:theme` |
 | 位图 | asset lock + CDN | 保留在 AAR |
 | 加载 | 验签、独立 ClassLoader、`PluginComponentManager` | application ClassLoader |
 

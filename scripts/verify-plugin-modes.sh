@@ -20,9 +20,11 @@ export ANDROID_HOME="$task_sdk"
     "-Pandroid.aapt2FromMavenOverride=$task_aapt2"
 
 task_plugin_report="$task_root/fixtures/producer/build/reports/x2c/release/report.json"
+task_plugin_component_report="$task_root/fixtures/producer/build/reports/x2c/release/activities.json"
 task_dex="$task_root/fixtures/producer/build/outputs/x2c/release/codegen-dex.jar"
 
 rg -q '"mode": "PLUGIN_SYNTHETIC_IDS"' "$task_plugin_report"
+rg -q '"themeKey": "layout\.showcase\.light\.v1"' "$task_plugin_component_report"
 [[ $(jar tf "$task_dex") == "classes.dex" ]]
 
 "$task_root/scripts/build-x2c-artifact.sh" \
@@ -40,6 +42,8 @@ unzip -Z1 "$task_aar" | rg '^res/layout/content\.xml$' >/dev/null
 unzip -Z1 "$task_aar" | rg '^res/drawable/hero\.jpg$' >/dev/null
 unzip -p "$task_aar" AndroidManifest.xml \
     | rg 'dev\.x2c\.fixture\.producer\.DemoActivity' >/dev/null
+unzip -p "$task_aar" AndroidManifest.xml \
+    | rg 'X2cProducerNormalManifestTheme' >/dev/null
 
 if "$task_root/gradlew" -p "$task_root" \
         :fixtures:producer:x2cReleaseDexJar \

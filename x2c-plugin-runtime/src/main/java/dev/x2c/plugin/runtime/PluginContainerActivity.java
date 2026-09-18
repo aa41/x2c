@@ -3,18 +3,59 @@ package dev.x2c.plugin.runtime;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.os.Bundle;
+import dev.x2c.runtime.PluginThemeRegistry;
 
 /** Real framework Activity that owns the Window and forwards lifecycle to one plugin delegate. */
 @SuppressLint("MissingSuperCall") // The plugin root calls the matching superOn* method exactly once.
 public abstract class PluginContainerActivity extends Activity {
     private PluginActivity pluginActivity;
+    private boolean pluginThemeActive;
+    private Resources.Theme bootstrapTheme;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
+        activatePluginTheme(PluginActivityManager.resolveActivityTheme(getIntent()));
         pluginActivity = PluginActivityManager.createDelegate(this, getIntent());
         pluginActivity.performCreate(savedInstanceState);
+    }
+
+    @Override public final Resources.Theme getTheme() {
+        if (pluginThemeActive) return super.getTheme();
+        if (bootstrapTheme == null) {
+            Resources.Theme temporary = super.getResources().newTheme();
+            Context base = getBaseContext();
+            if (base != null && base.getTheme() != null) {
+                temporary.setTo(base.getTheme());
+            }
+            bootstrapTheme = temporary;
+        }
+        return bootstrapTheme;
+    }
+
+    @Override public final void setTheme(int resId) {
+        if (!pluginThemeActive) {
+            // ActivityThread applies the manifest/container theme before onCreate. Defer the real
+            // Theme object until the target plugin Activity and its host-owned theme are known.
+            return;
+        }
+        PluginThemeRegistry.requireRegisteredStyle(resId);
+        super.setTheme(resId);
+    }
+
+    private void activatePluginTheme(int styleResId) {
+        PluginThemeRegistry.requireRegisteredStyle(styleResId);
+        pluginThemeActive = true;
+        bootstrapTheme = null;
+        try {
+            super.setTheme(styleResId);
+        } catch (RuntimeException | Error failure) {
+            pluginThemeActive = false;
+            throw failure;
+        }
     }
 
     @Override protected void onStart() {

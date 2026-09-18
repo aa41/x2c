@@ -70,6 +70,16 @@ final class CustomViewRegistry {
         return (int) byTag.values().stream().distinct().count();
     }
 
+    List<ViewSpec> containerViews() {
+        Map<String, ViewSpec> byClassName = new TreeMap<>();
+        for (ViewSpec spec : byTag.values()) {
+            if (spec.container() != null) {
+                byClassName.put(spec.className(), spec);
+            }
+        }
+        return Collections.unmodifiableList(new ArrayList<ViewSpec>(byClassName.values()));
+    }
+
     private static void validateView(File file, ViewSpec spec) {
         if (spec == null || isBlank(spec.tag)) {
             throw failure(file, "Every custom View requires tag");
@@ -78,6 +88,12 @@ final class CustomViewRegistry {
             spec.className = spec.tag;
         }
         validateJavaType(file, spec.className);
+        if (isBlank(spec.frameworkBase)) {
+            spec.frameworkBase = null;
+        } else if (!FrameworkViewRegistry.FRAMEWORK_VIEW_TAGS.contains(spec.frameworkBase)) {
+            throw failure(file, "Unsupported frameworkBase for " + spec.tag + ": "
+                    + spec.frameworkBase);
+        }
         if (isBlank(spec.constructor)) {
             spec.constructor = "CONTEXT";
         }
@@ -89,6 +105,11 @@ final class CustomViewRegistry {
         }
         spec.attributesByName = validateAttributes(file, spec.tag, spec.attributes, false);
         if (spec.container != null) {
+            if (spec.frameworkBase != null) {
+                throw failure(file, "frameworkBase and container cannot be combined for "
+                        + spec.tag + "; use the framework container contract or an explicit "
+                        + "custom container contract, not both");
+            }
             validateContainer(file, spec);
         }
     }
@@ -195,6 +216,7 @@ final class CustomViewRegistry {
     static final class ViewSpec {
         private String tag;
         private String className;
+        private String frameworkBase;
         private String constructor;
         private List<AttributeSpec> attributes;
         private ContainerSpec container;
@@ -202,6 +224,10 @@ final class CustomViewRegistry {
 
         String className() {
             return className;
+        }
+
+        String frameworkBase() {
+            return frameworkBase;
         }
 
         String constructor() {

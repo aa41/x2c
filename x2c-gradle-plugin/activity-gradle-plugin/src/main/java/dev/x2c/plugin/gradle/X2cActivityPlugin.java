@@ -12,6 +12,7 @@ import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.attributes.Attribute;
 import org.gradle.api.file.FileCollection;
+import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.TaskProvider;
 
 /** Adds an Android component transformation stage between the class-only X2C JAR and D8. */
@@ -54,7 +55,7 @@ public final class X2cActivityPlugin implements Plugin<Project> {
                             // invocation reaches the explicit pluginMode guard instead of failing
                             // Gradle property validation with an unrelated missing-value message.
                             task.getPluginId().set(x2c.getPluginId());
-                            task.getPluginMode().set(x2c.getPluginMode().orElse(x2c.getX2cEnable()));
+                            task.getPluginMode().set(pluginModeProvider(project, x2c));
                             // Runtime configuration is the complete transitive dependency closure
                             // of this Android variant. The task accepts JARs, class directories and
                             // resource-free AARs, then applies one transform to all retained classes.
@@ -87,6 +88,13 @@ public final class X2cActivityPlugin implements Plugin<Project> {
                 });
             }
         });
+    }
+
+    /** Gradle 5.4 has Property#set(Provider), but not Provider#orElse(Provider). */
+    private static Provider<Boolean> pluginModeProvider(Project project, X2cExtension x2c) {
+        return project.provider(() -> x2c.getPluginMode().isPresent()
+                ? x2c.getPluginMode().get()
+                : x2c.getX2cEnable().get());
     }
 
     /**

@@ -44,7 +44,8 @@ Consequences:
 Host shrinking cannot see future plugin references. Keep public host facades, reflected generated
 bootstrap/registry names, runtime containers, and any compile-only host dependencies required by
 the plugin. Prefer narrow stable facades even if the host is temporarily kept broadly during early
-development.
+development. The `x2c-plugin-runtime` AAR carries consumer rules for X2C runtime/API/base packages;
+those rules intentionally do not keep application-specific host APIs.
 
 ## Application and hardening SDKs
 

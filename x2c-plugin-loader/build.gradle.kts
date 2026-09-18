@@ -3,9 +3,6 @@ plugins {
     `maven-publish`
 }
 
-group = "dev.x2c"
-version = "0.1.0-SNAPSHOT"
-
 val androidSdkDirectory = System.getenv("ANDROID_HOME")
     ?: System.getenv("ANDROID_SDK_ROOT")
     ?: "${System.getProperty("user.home")}/Library/Android/sdk"

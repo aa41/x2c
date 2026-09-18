@@ -160,6 +160,11 @@ final class CompileOnlyBaseClosure {
                         && selected.add(candidate)) {
                     changed = true;
                 }
+                if (candidate.info.enclosingOwner != null
+                        && containsEntry(selected, candidate.info.enclosingOwner + ".class")
+                        && selected.add(candidate)) {
+                    changed = true;
+                }
             }
         } while (changed);
     }
@@ -367,6 +372,7 @@ final class CompileOnlyBaseClosure {
         }
 
         @Override public void visitOuterClass(String owner, String name, String descriptor) {
+            info.enclosingOwner = owner;
             addInternal(info.references, owner);
             addDescriptor(info.references, descriptor);
         }
@@ -713,6 +719,7 @@ final class CompileOnlyBaseClosure {
         String name;
         String superName;
         String nestHost;
+        String enclosingOwner;
         boolean markedBase;
         final Set<String> references = new TreeSet<String>();
         final Set<String> explicitIncludes = new TreeSet<String>();

@@ -254,11 +254,19 @@ def inspect_components(module_dir: Path) -> Dict[str, object]:
     result: Dict[str, object] = {}
     activity_annotations = re.findall(r"@X2cPluginActivity(?:\s*\((.*?)\))?", combined, re.DOTALL)
     modes: Dict[str, int] = {name: 0 for name in ("STANDARD", "SINGLE_TOP", "SINGLE_TASK", "SINGLE_INSTANCE")}
+    theme_keys: List[str] = []
+    keyed_activities = 0
     for body in activity_annotations:
         match = re.search(r"PluginLaunchMode\.([A-Z_]+)", body)
         modes[match.group(1) if match and match.group(1) in modes else "STANDARD"] += 1
+        theme = re.search(r"\bthemeKey\s*=\s*[\"']([^\"']*)[\"']", body)
+        if theme and theme.group(1):
+            theme_keys.append(theme.group(1))
+            keyed_activities += 1
     result["activity_modes"] = modes
     result["activities"] = len(activity_annotations)
+    result["theme_keys"] = sorted(set(theme_keys))
+    result["default_theme_activities"] = len(activity_annotations) - keyed_activities
     result["services"] = len(re.findall(r"@X2cPluginService\b", combined))
     result["receivers"] = len(re.findall(r"@X2cPluginReceiver\b", combined))
     result["providers"] = len(re.findall(r"@X2cPluginProvider\b", combined))
@@ -282,7 +290,7 @@ def inspect_resources(report: Report, module_dir: Path, mode: str) -> None:
                 report.add("BLOCKER", "nine-patch", "Nine-patch is unsupported in plugin mode", str(path))
             if path.suffix.lower() == ".xml":
                 text = read_text(path)
-                if re.search(r"<(?:style|declare-styleable|vector|animated-vector|ripple|include|merge)\b", text):
+                if re.search(r"<(?:style|declare-styleable|vector|animated-vector|ripple|merge)\b", text):
                     report.add("BLOCKER", "unsupported-resource", "Unsupported plugin XML construct detected", str(path))
 
     bitmaps = [
@@ -303,6 +311,7 @@ def check_source_contracts(report: Report, module_dir: Path, mode: str) -> None:
     bad_generated: List[Path] = []
     r_references: List[Path] = []
     init_calls: List[Path] = []
+    common_plugin_runtime_imports: List[Path] = []
     for path in source_files(module_dir, (".java", ".kt")):
         text = read_text(path)
         if re.search(r"(?:import\s+[^;\n]*\.generated\.|\bX2c(?:Module|Layouts|ResourceProviderImpl)\b)", text):
@@ -311,6 +320,10 @@ def check_source_contracts(report: Report, module_dir: Path, mode: str) -> None:
             r_references.append(path)
         if "X2C.init(" in text:
             init_calls.append(path)
+        relative = path.relative_to(module_dir / "src")
+        if (relative.parts and relative.parts[0] == "main"
+                and "dev.x2c.plugin.runtime" in text):
+            common_plugin_runtime_imports.append(path)
     if bad_generated:
         report.add("BLOCKER", "generated-api", "Business source references generated implementation", str(bad_generated[0]))
     else:
@@ -319,6 +332,18 @@ def check_source_contracts(report: Report, module_dir: Path, mode: str) -> None:
         report.add("BLOCKER", "android-r", "Plugin source appears to reference a non-framework R class", str(r_references[0]))
     if init_calls:
         report.add("BLOCKER", "producer-init", "Library/plugin source must not initialize the process-wide X2C runtime", str(init_calls[0]))
+    if common_plugin_runtime_imports:
+        severity = "BLOCKER" if mode == "normal" else "WARN"
+        message = (
+            "Normal/shared source imports plugin runtime; move component routing behind a "
+            "mode-specific source-set adapter"
+        )
+        report.add(
+            severity,
+            "mode-specific-runtime",
+            message,
+            str(common_plugin_runtime_imports[0]),
+        )
 
 
 def check_plugin_module(report: Report, root: Path, module_dir: Path, text: str) -> None:
@@ -424,6 +449,38 @@ def check_normal_module(report: Report, module_dir: Path, text: str) -> None:
     else:
         report.add("WARN", "normal-runtime", "No x2c-runtime dependency detected; acceptable only if business code does not call X2C")
 
+    components = inspect_components(module_dir)
+    if int(components["activities"]):
+        report.add(
+            "PASS",
+            "normal-theme-key-ignored",
+            "@X2cPluginActivity is present but normal mode ignores themeKey and component transform",
+        )
+
+    manifest_activities = 0
+    manifest_themes = 0
+    manifest_paths: List[Path] = []
+    for manifest in source_files(module_dir, (".xml",)):
+        if manifest.name != "AndroidManifest.xml":
+            continue
+        declarations = re.findall(r"<activity\b([^>]*)>", read_text(manifest), re.DOTALL)
+        if declarations:
+            manifest_paths.append(manifest)
+            manifest_activities += len(declarations)
+            manifest_themes += sum(
+                bool(re.search(r"\bandroid:theme\s*=", declaration))
+                for declaration in declarations
+            )
+    if manifest_activities:
+        inherited = manifest_activities - manifest_themes
+        report.add(
+            "PASS",
+            "normal-manifest-theme",
+            f"Normal Manifest declares {manifest_activities} Activity entry/entries: "
+            f"{manifest_themes} explicit theme(s), {inherited} application-theme inheritance path(s)",
+            ", ".join(str(path) for path in manifest_paths),
+        )
+
     if "x2cEnable" not in text and "dev.x2c.codegen" not in text:
         report.add("PASS", "normal-codegen", "Native system-resource mode does not require generated Java")
     elif "dev.x2c.codegen" in text:
@@ -432,7 +489,12 @@ def check_normal_module(report: Report, module_dir: Path, text: str) -> None:
         report.add("BLOCKER", "normal-codegen", "x2cEnable is configured but dev.x2c.codegen is not applied")
 
 
-def check_host(report: Report, host_dir: Optional[Path], mode: str) -> None:
+def check_host(
+    report: Report,
+    host_dir: Optional[Path],
+    mode: str,
+    components: Optional[Dict[str, object]] = None,
+) -> None:
     if host_dir is None:
         if mode == "plugin":
             report.add("WARN", "host-scope", "No host module was supplied; runtime ownership and initialization were not checked")
@@ -458,13 +520,58 @@ def check_host(report: Report, host_dir: Optional[Path], mode: str) -> None:
                 )
             else:
                 report.add("BLOCKER", f"host-{artifact}", f"Host must implementation-depend on {artifact}", ",".join(scopes) or "missing")
-    init_paths = [path for path in source_files(host_dir, (".java", ".kt")) if "X2C.init(" in read_text(path)]
+    host_sources = list(source_files(host_dir, (".java", ".kt")))
+    host_source_text = "\n".join(read_text(path) for path in host_sources)
+    init_paths = [path for path in host_sources if "X2C.init(" in read_text(path)]
     if len(init_paths) == 1:
         report.add("PASS", "host-init", "Exactly one host X2C.init call was found", str(init_paths[0]))
     elif not init_paths:
         report.add("BLOCKER", "host-init", "Host must initialize X2C once before resource/plugin access", str(host_dir / "src"))
     else:
         report.add("BLOCKER", "host-init", f"Host contains {len(init_paths)} X2C.init call sites; keep one process-wide initialization", ", ".join(str(path) for path in init_paths))
+
+    activity_count = int(components.get("activities", 0)) if components else 0
+    if mode == "plugin" and activity_count:
+        if "PluginHostConfig" in host_source_text:
+            report.add(
+                "PASS",
+                "host-theme-config",
+                f"Host publishes PluginHostConfig for {activity_count} plugin Activity entry/entries",
+            )
+        else:
+            report.add(
+                "WARN",
+                "host-theme-config",
+                "Could not statically confirm PluginHostConfig; every plugin Activity requires "
+                "a host theme catalog before installation",
+                str(host_dir / "src"),
+            )
+        for theme_key in components.get("theme_keys", []):
+            if re.search(rf"[\"']{re.escape(str(theme_key))}[\"']", host_source_text):
+                report.add(
+                    "PASS",
+                    "host-theme-key",
+                    f"Host source contains plugin Activity themeKey {theme_key}",
+                )
+            else:
+                report.add(
+                    "WARN",
+                    "host-theme-key",
+                    f"Could not statically find plugin Activity themeKey {theme_key} in the host; "
+                    "runtime installation will reject a missing mapping",
+                    str(host_dir / "src"),
+                )
+        if int(components.get("default_theme_activities", 0)):
+            severity = "PASS" if "defaultActivityTheme" in host_source_text else "WARN"
+            report.add(
+                severity,
+                "host-default-theme",
+                "Host source contains a default plugin Activity theme"
+                if severity == "PASS"
+                else "Plugin Activities with empty themeKey require defaultActivityTheme; "
+                "no literal registration was found",
+                str(host_dir / "src"),
+            )
 
 
 def print_report(report: Report, payload: Dict[str, object], output_format: str) -> None:
@@ -506,13 +613,15 @@ def main(argv: Sequence[str]) -> int:
     check_environment(report, root, module_build)
     if args.mode == "plugin":
         check_plugin_module(report, root, module_dir, text)
+        components = inspect_components(module_dir)
     else:
         check_normal_module(report, module_dir, text)
+        components = None
     inspect_resources(report, module_dir, args.mode)
     check_source_contracts(report, module_dir, args.mode)
 
     host_dir = resolve_module(root, args.host_module, args.host_dir) if (args.host_module or args.host_dir) else None
-    check_host(report, host_dir, args.mode)
+    check_host(report, host_dir, args.mode, components)
 
     payload = {
         "schema": 1,

@@ -7,7 +7,9 @@ import static dev.x2c.compiler.resource.ResourceValueParser.*;
 import static dev.x2c.compiler.resource.XmlSupport.*;
 
 import java.io.File;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
@@ -39,26 +41,25 @@ final class LayoutResourceParser {
     String name = resourceNameFromFile(source.file);
     Document document = parseXml(source.file);
     rejectThemeSyntax(source.file, document);
-    LayoutNode root = parseLayoutNode(source.file, document.getDocumentElement(), model, null);
-    if (!isContainer(root)) {
-      throw fail(
-          source.file,
-          "Layout root must be a supported framework ViewGroup or registered custom ViewGroup");
-    }
-    for (String attribute : root.attributes.keySet()) {
-      if (attribute.startsWith("layout_")
-          && !attribute.equals("layout_width")
-          && !attribute.equals("layout_height")) {
-        throw fail(
-            source.file,
-            "Root layout cannot use parent LayoutParams attribute: android:" + attribute);
-      }
-    }
+    LayoutNode root = parseLayoutNode(
+        source.file, document.getDocumentElement(), model, null, new LinkedHashSet<String>());
     putUnique(model.layouts, name, root, source.file, "layout");
   }
 
   static LayoutNode parseLayoutNode(File file, Element element, Model model, LayoutNode parent) {
+    return parseLayoutNode(file, element, model, parent, new LinkedHashSet<String>());
+  }
+
+  private static LayoutNode parseLayoutNode(
+      File file,
+      Element element,
+      Model model,
+      LayoutNode parent,
+      Set<String> includeStack) {
     String xmlTag = element.getTagName();
+    if (xmlTag.equals("include")) {
+      return parseIncludeNode(file, element, model, parent, includeStack);
+    }
     String resolvedTag = xmlTag;
     if (xmlTag.equals("view")) {
       resolvedTag = element.getAttribute("class");
@@ -73,7 +74,9 @@ final class LayoutResourceParser {
           file, "Unregistered custom View: " + resolvedTag + ". Declare it in x2c.customViewsFile");
     }
     String javaType = customView == null ? resolvedTag : customView.className();
-    LayoutNode node = new LayoutNode(resolvedTag, javaType, customView);
+    String behaviorTag = customView == null || customView.frameworkBase() == null
+        ? resolvedTag : customView.frameworkBase();
+    LayoutNode node = new LayoutNode(behaviorTag, javaType, customView);
     NamedNodeMap attributes = element.getAttributes();
     for (int index = 0; index < attributes.getLength(); index++) {
       Node attribute = attributes.item(index);
@@ -132,6 +135,10 @@ final class LayoutResourceParser {
                     file, name, attribute.getNodeValue(), parentLayoutAttribute)));
         continue;
       }
+      if (parent == null && name != null && name.startsWith("layout_")) {
+        collectRootLayoutAttribute(file, node, name, attribute.getNodeValue(), model);
+        continue;
+      }
       if (name != null
           && name.startsWith("layout_")
           && parent != null
@@ -170,13 +177,185 @@ final class LayoutResourceParser {
       if (!isContainer(node)) {
         throw fail(file, resolvedTag + " cannot contain child views");
       }
-      node.children.add(parseLayoutNode(file, child, model, node));
+      node.children.add(parseLayoutNode(file, child, model, node, includeStack));
     }
-    if ((resolvedTag.equals("ScrollView") || resolvedTag.equals("HorizontalScrollView"))
+    if ((node.tag.equals("ScrollView") || node.tag.equals("HorizontalScrollView"))
         && node.children.size() > 1) {
       throw fail(file, resolvedTag + " can contain only one direct child");
     }
     return node;
+  }
+
+  private static void collectRootLayoutAttribute(
+      File file, LayoutNode node, String name, String rawValue, Model model) {
+    boolean supported = false;
+    for (CustomViewRegistry.ViewSpec parent : model.customViews.containerViews()) {
+      CustomViewRegistry.AttributeSpec attribute = parent.container().layoutAttribute(name);
+      if (attribute == null) {
+        continue;
+      }
+      supported = true;
+      CustomAttributeValue value = new CustomAttributeValue(
+          attribute, normalizedAttributeValue(file, name, rawValue, attribute));
+      validateCustomAttribute(file, value, model);
+      Map<String, CustomAttributeValue> values =
+          node.rootLayoutAttributesByParentClass.get(parent.className());
+      if (values == null) {
+        values = new java.util.TreeMap<String, CustomAttributeValue>();
+        node.rootLayoutAttributesByParentClass.put(parent.className(), values);
+      }
+      values.put(name, value);
+    }
+    if (!supported) {
+      throw fail(
+          file,
+          "Unsupported root LayoutParams attribute: " + name
+              + ". Declare its parent contract in x2c.customViewsFile");
+    }
+  }
+
+  private static LayoutNode parseIncludeNode(
+      File file,
+      Element include,
+      Model model,
+      LayoutNode parent,
+      Set<String> includeStack) {
+    if (parent == null || !isContainer(parent)) {
+      throw fail(file, "<include> requires a supported ViewGroup parent");
+    }
+    String reference = include.getAttribute("layout");
+    if (!reference.startsWith("@layout/")) {
+      throw fail(file, "<include> layout must be a local @layout reference: " + reference);
+    }
+    String name = referenceName(reference, "layout");
+    ResourceFile included = model.layoutFiles.get(name);
+    if (included == null) {
+      throw fail(file, "Unknown included layout: " + reference);
+    }
+    if (!includeStack.add(name)) {
+      throw fail(file, "Cyclic <include> layout reference: " + includeStack + " -> " + name);
+    }
+    try {
+      Document document = parseXml(included.file);
+      rejectThemeSyntax(included.file, document);
+      Element includedRoot = document.getDocumentElement();
+      validateIncludeAttributes(file, include, includedRoot, model, parent);
+      applyIncludeOverrides(include, includedRoot);
+      return parseLayoutNode(included.file, includedRoot, model, parent, includeStack);
+    } finally {
+      includeStack.remove(name);
+    }
+  }
+
+  private static void validateIncludeAttributes(
+      File file,
+      Element include,
+      Element includedRoot,
+      Model model,
+      LayoutNode parent) {
+    LayoutNode includedNode = includeRootDescriptor(file, includedRoot, model);
+    NamedNodeMap attributes = include.getAttributes();
+    for (int index = 0; index < attributes.getLength(); index++) {
+      Node attribute = attributes.item(index);
+      if (attribute.getNodeName().startsWith("xmlns")) {
+        continue;
+      }
+      String namespace = attribute.getNamespaceURI();
+      String localName = attribute.getLocalName();
+      if (localName == null) {
+        localName = attribute.getNodeName();
+      }
+      if (namespace == null && "layout".equals(localName)) {
+        continue;
+      }
+      if (ANDROID_NS.equals(namespace)) {
+        if ("id".equals(localName) || "visibility".equals(localName)) {
+          continue;
+        }
+        if (localName.startsWith("layout_")) {
+          boolean frameworkLayoutAttribute = FRAMEWORK_CONTAINERS.contains(parent.tag)
+              && isAllowedFrameworkLayoutAttribute(parent.tag, localName);
+          boolean customBuiltInLayoutAttribute = parent.container() != null
+              && (setOf("layout_width", "layout_height").contains(localName)
+                  || localName.startsWith("layout_margin")
+                      && parent.container().marginLayoutParams());
+          if (frameworkLayoutAttribute || customBuiltInLayoutAttribute) {
+            continue;
+          }
+        } else if (isAllowedLayoutAttribute(includedNode, localName)) {
+          continue;
+        }
+      } else if (namespace != null) {
+        CustomViewRegistry.AttributeSpec layoutAttribute = parent.container() == null
+            ? null : parent.container().layoutAttribute(localName);
+        CustomViewRegistry.AttributeSpec viewAttribute = includedNode.customView == null
+            ? null : includedNode.customView.attribute(localName);
+        if (layoutAttribute != null || viewAttribute != null) {
+          continue;
+        }
+      }
+      throw fail(file, "Unsupported attribute on <include>: " + attribute.getNodeName());
+    }
+  }
+
+  private static LayoutNode includeRootDescriptor(
+      File file, Element includedRoot, Model model) {
+    String xmlTag = includedRoot.getTagName();
+    String resolvedTag = xmlTag;
+    if ("view".equals(xmlTag)) {
+      resolvedTag = includedRoot.getAttribute("class");
+      if (resolvedTag.trim().isEmpty()) {
+        throw fail(file, "<view> requires a class attribute");
+      }
+    }
+    CustomViewRegistry.ViewSpec customView = FRAMEWORK_VIEW_TAGS.contains(resolvedTag)
+        ? null : model.customViews.find(resolvedTag);
+    if (!FRAMEWORK_VIEW_TAGS.contains(resolvedTag) && customView == null) {
+      throw fail(
+          file, "Unregistered custom View: " + resolvedTag + ". Declare it in x2c.customViewsFile");
+    }
+    String behaviorTag = customView == null || customView.frameworkBase() == null
+        ? resolvedTag : customView.frameworkBase();
+    String javaType = customView == null ? resolvedTag : customView.className();
+    return new LayoutNode(behaviorTag, javaType, customView);
+  }
+
+  /** Mirrors LayoutInflater's include contract without carrying an AttributeSet at runtime. */
+  private static void applyIncludeOverrides(Element include, Element includedRoot) {
+    boolean replaceLayoutParams = !include.getAttributeNS(ANDROID_NS, "layout_width").isEmpty()
+        && !include.getAttributeNS(ANDROID_NS, "layout_height").isEmpty();
+    if (replaceLayoutParams) {
+      NamedNodeMap includedAttributes = includedRoot.getAttributes();
+      java.util.List<Node> remove = new java.util.ArrayList<Node>();
+      for (int index = 0; index < includedAttributes.getLength(); index++) {
+        Node attribute = includedAttributes.item(index);
+        if (attribute.getLocalName() != null
+            && attribute.getLocalName().startsWith("layout_")) {
+          remove.add(attribute);
+        }
+      }
+      for (Node attribute : remove) {
+        if (attribute.getNamespaceURI() == null) {
+          includedRoot.removeAttribute(attribute.getNodeName());
+        } else {
+          includedRoot.removeAttributeNS(attribute.getNamespaceURI(), attribute.getLocalName());
+        }
+      }
+    }
+
+    NamedNodeMap overrides = include.getAttributes();
+    for (int index = 0; index < overrides.getLength(); index++) {
+      Node attribute = overrides.item(index);
+      String localName = attribute.getLocalName();
+      boolean identityOverride = ANDROID_NS.equals(attribute.getNamespaceURI())
+          && ("id".equals(localName) || "visibility".equals(localName));
+      boolean layoutParamsOverride = replaceLayoutParams
+          && localName != null && localName.startsWith("layout_");
+      if (identityOverride || layoutParamsOverride) {
+        includedRoot.setAttributeNS(
+            attribute.getNamespaceURI(), attribute.getNodeName(), attribute.getNodeValue());
+      }
+    }
   }
 
   private static String normalizedAttributeValue(
@@ -241,6 +420,7 @@ final class LayoutResourceParser {
               "minWidth",
               "minHeight",
               "lineSpacingExtra",
+              "drawablePadding",
               "layout_x",
               "layout_y")
           .contains(name)) {
@@ -263,6 +443,15 @@ final class LayoutResourceParser {
         resolveString(file, value, model);
       } else if ("src".equals(name)) {
         resolveDrawable(file, value, model);
+      } else if (setOf(
+              "drawableLeft",
+              "drawableTop",
+              "drawableRight",
+              "drawableBottom",
+              "drawableStart",
+              "drawableEnd")
+          .contains(name)) {
+        resolveCompoundDrawable(file, value, model);
       } else if ("orientation".equals(name)) {
         requireOneOf(file, name, value, "horizontal", "vertical");
       } else if (setOf("gravity", "foregroundGravity").contains(name)) {
@@ -275,8 +464,6 @@ final class LayoutResourceParser {
               "longClickable",
               "focusable",
               "focusableInTouchMode",
-              "selected",
-              "activated",
               "saveEnabled",
               "keepScreenOn",
               "fitsSystemWindows",
@@ -431,15 +618,6 @@ final class LayoutResourceParser {
             .anyMatch(name -> setOf("paddingStart", "paddingEnd").contains(name));
     if (absolutePadding && relativePadding) {
       throw fail(file, "Do not mix absolute and relative padding attributes");
-    }
-    boolean absoluteMargins =
-        node.attributes.keySet().stream()
-            .anyMatch(name -> setOf("layout_marginLeft", "layout_marginRight").contains(name));
-    boolean relativeMargins =
-        node.attributes.keySet().stream()
-            .anyMatch(name -> setOf("layout_marginStart", "layout_marginEnd").contains(name));
-    if (absoluteMargins && relativeMargins) {
-      throw fail(file, "Do not mix absolute and relative margin attributes");
     }
   }
 

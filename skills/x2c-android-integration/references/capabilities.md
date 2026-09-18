@@ -18,21 +18,32 @@ Supported generated data:
   child is synchronously representable;
 - plugin bitmap metadata through immutable CDN locks; normal-mode local bitmap resources.
 
-Plugin mode intentionally rejects qualifiers, theme/style/styleable, vector, ripple, nine-patch,
-animated drawable, Data/View Binding, include/merge, resource overlay, raw/XML resources, public
+Plugin mode intentionally rejects plugin-owned qualifiers, theme/style/styleable, vector, ripple, nine-patch,
+animated drawable, Data/View Binding, `<merge>`, resource overlay, raw/XML resources, public
 Android `R`, and arbitrary dynamic resource APIs. Normal mode with native resources may use normal
 Android capabilities when `x2cEnable=false`; do not claim the XML-to-Java compiler implemented them.
 
 ## Layout and View model
 
 Common View properties include ID, dimensions, weight/gravity/margins/padding, background/tint/
-foreground, visibility and interaction state, content metadata/tag/tooltip/transition, alpha,
+foreground, visibility and interaction flags, content metadata/tag/tooltip/transition, alpha,
 elevation/transforms, minimum size, layout direction, over-scroll, scrollbar flags, and common
 accessibility fields.
 
+Local `<include>` elements are expanded at compile time. `id` and `visibility` override the included
+root; LayoutParams replace the included set only when the include site supplies both width and
+height. Other View attributes stay owned by the included layout, matching `LayoutInflater`. Every
+include-site attribute is still validated; unknown namespaces, attributes, and misspellings fail the build.
+Generated roots use the actual `inflate` parent through `ParentAwareLayoutFactory`. Framework and
+declared custom-container LayoutParams preserve root margins, gravity, rules, weights, and typed
+`app:layout_*` values. Legacy generated plugins remain compatible through `LayoutFactory` fallback;
+an unknown custom parent fails closed only when the root needs a parent-specific contract.
+
 Typed families include:
 
-- TextView/EditText/Button: text/hint/colors, lines, typeface style, ellipsize, input/IME fields;
+- TextView/EditText/Button: text/hint/colors, lines, typeface style, ellipsize, input/IME fields,
+  compound drawables and drawable padding. Plugin CDN bitmaps are rejected for this synchronous API;
+  normal-mode local bitmaps resolve through Android Resources;
 - ImageView/ImageButton: source, scale type, tint;
 - CompoundButton, ProgressBar, SeekBar, RatingBar and common picker/switch controls;
 - 53 registered framework View/ViewGroup tags in the current baseline.
@@ -56,6 +67,7 @@ Custom tags are explicit JSON contracts; generation uses direct Java calls, not 
   "schema": 1,
   "views": [{
     "tag": "com.example.widget.StatusView",
+    "frameworkBase": "TextView",
     "constructor": "CONTEXT_ATTRS_DEF_STYLE",
     "attributes": [
       {"name": "label", "setter": "setLabel", "type": "STRING"},
@@ -67,7 +79,14 @@ Custom tags are explicit JSON contracts; generation uses direct Java calls, not 
 
 Constructors are `CONTEXT`, `CONTEXT_ATTRS`, or `CONTEXT_ATTRS_DEF_STYLE`. The latter two receive a
 null `AttributeSet`; custom values are applied afterward through declared public setters/fields.
-This does not reproduce theme/styleable/defStyle parsing.
+This does not reproduce plugin theme/styleable/defStyle parsing. Plugin Activities may select a
+real, host-packaged style through a stable `themeKey`; that is a host component contract, not
+style XML-to-Java compilation.
+
+Optional `frameworkBase` names a supported framework tag whose public attribute behavior the custom
+class inherits. It preserves construction of the custom type; it does not replace or generate that
+class. Do not combine `frameworkBase` with a custom `container` contract; that ambiguous combination
+fails the build.
 
 Custom ViewGroups can declare `container`, a LayoutParams class or static factory, margin support,
 parent-specific typed layout setters/fields, and a children-finished hook. Any Java ViewGroup class
@@ -84,6 +103,11 @@ LinearLayout.
   resource handles remain module-scoped. Never use an ambiguous old int-only API across modules.
 
 ## Android components
+
+Activity themes follow the component creation model, not the XML-to-Java resource model. Normal
+Activities are framework components and use the merged Manifest's Activity theme, falling back to
+the application theme. Plugin Activities are delegates and use only `@X2cPluginActivity.themeKey`
+mapped to a real host-packaged style. Plugin Manifest themes are neither packaged nor consulted.
 
 - Activity: standard, singleTop, singleTask, and singleInstance; lifecycle/result/new-intent and a
   documented subset of Activity APIs are bridged.

@@ -6,9 +6,12 @@ import java.util.Objects;
 public final class PluginActivityInfo {
     public final String className;
     public final PluginLaunchMode launchMode;
+    public final String themeKey;
 
-    public PluginActivityInfo(String className, PluginLaunchMode launchMode) {
+    public PluginActivityInfo(
+            String className, PluginLaunchMode launchMode, String themeKey) {
         this.className = Objects.requireNonNull(className, "className");
         this.launchMode = Objects.requireNonNull(launchMode, "launchMode");
+        this.themeKey = Objects.requireNonNull(themeKey, "themeKey");
     }
 }

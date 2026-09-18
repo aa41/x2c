@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The same Activity source has @X2cPluginActivity, but normal mode uses this Manifest theme. -->
+    <style name="X2cProducerNormalManifestTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">#7B1FA2</item>
+        <item name="android:windowBackground">#F4F6FA</item>
+    </style>
+</resources>

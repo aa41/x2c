@@ -12,7 +12,7 @@ import dev.x2c.runtime.X2cResources;
 import java.util.List;
 
 /** Bilibili-inspired local interaction demo, loaded only from the signed plugin DEX. */
-@X2cPluginActivity
+@X2cPluginActivity(themeKey = "video.home.light.v1")
 public final class VideoHomeActivity extends BasePluginActivity {
   private X2cResources res;
   private LinearLayout feed, channels, bottom;

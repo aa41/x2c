@@ -23,7 +23,9 @@ explicitly.
    depend on a runtime available only as `compileOnly`.
 3. Keep ordinary resources, local bitmaps, qualifiers, and the library Manifest. Declare Activity,
    Service, Receiver, and Provider normally. Android framework/AGP performs Manifest and resource
-   merging.
+   merging. Activity theming follows the merged Manifest: an Activity-level `android:theme` wins,
+   otherwise Android inherits the application theme. Normal mode never consumes
+   `@X2cPluginActivity.themeKey` or the host plugin theme table.
 4. Do not build or publish `x2c<Variant>Jar`/`x2c<Variant>DexJar`; normal resources cannot be detached
    from the final application resource table. Use `x2cBuild<Variant>` or `assemble<Variant>` and
    publish the AAR.
@@ -56,9 +58,11 @@ explicitly.
 
 A boolean does not make one artifact safely interchangeable between plugin and normal delivery.
 The dependency scopes, Manifest, image policy, component creation model, and artifact type also
-change. Prefer two publishing modules sharing business source. If one module must switch, use the
-same strict Gradle Provider to control mode, dependency scopes, Manifest source, and image/resource
-inputs together, then verify both outputs independently.
+change. Prefer a mode-neutral feature/core module plus thin plugin and normal delivery modules. If
+one Android library module must switch, keep plugin manager calls in `src/plugin` and native
+Manifest/Intent adapters in `src/normal`; common `src/main` code must not import plugin runtime.
+Use the same strict Gradle Provider to control source sets, dependency scopes, Manifest source, and
+image/resource inputs together, then verify both outputs independently.
 
 ## Required build result
 

@@ -1,7 +1,9 @@
 package dev.x2c.plugin.runtime;
 
 import android.content.Context;
+import dev.x2c.plugin.api.PluginActivityInfo;
 import dev.x2c.plugin.api.PluginComponentRegistry;
+import dev.x2c.runtime.PluginThemeRegistry;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashSet;
@@ -69,6 +71,10 @@ public final class PluginComponentManager {
         }
         String pluginId = requirePluginId(registry.pluginId());
         dev.x2c.runtime.X2C.requireInitialized(context);
+        PluginActivityInfo[] activities = PluginActivityManager.validateActivities(registry);
+        for (PluginActivityInfo activity : activities) {
+            PluginThemeRegistry.validateActivityTheme(activity.themeKey, activity.className);
+        }
         dev.x2c.runtime.X2C.registerPluginClassLoader(pluginClassLoader);
 
         synchronized (INSTALL_LOCK) {
@@ -82,7 +88,8 @@ public final class PluginComponentManager {
             boolean serviceInstalled = false;
             boolean receiverInstalled = false;
             try {
-                PluginActivityManager.installActivities(pluginClassLoader, registry);
+                PluginActivityManager.installActivities(
+                        pluginClassLoader, registry, activities);
                 activityInstalled = true;
                 PluginServiceManager.install(registry);
                 serviceInstalled = true;

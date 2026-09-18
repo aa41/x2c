@@ -2,7 +2,7 @@
 
 当前测试入口为一个 [三合一 Demo APK](docs/DEMO_SUITE.md)：全能力实验室、哔哩哔哩风格首页插件、普通 X2C API 工作台。构建任务：`:fixtures:consumer:assembleDebug`。
 
-Application 共享、宿主初始化和 ClassLoader 身份约定见 [宿主 Application 契约](docs/HOST_APPLICATION_CONTRACT.md)。当前组件 runtime ABI 为 2，旧载荷需重新构建。
+Application 共享、宿主初始化、Activity 主题和 ClassLoader 身份约定见 [宿主 Application 契约](docs/HOST_APPLICATION_CONTRACT.md)。当前组件 runtime ABI 为 4，旧载荷需重新构建。
 
 将受控 Android library 的一部分 XML/resources 编译为 Java class，并输出可独立消费的 JAR。
 
@@ -17,6 +17,7 @@ Application 共享、宿主初始化和 ClassLoader 身份约定见 [宿主 Appl
 - [Activity 插件设计](docs/ACTIVITY_PLUGIN.md)
 - [Android 插件组件协议](docs/PLUGIN_COMPONENTS.md)
 - [pluginMode 安全切换指南](docs/PLUGIN_MODE.md)
+- [gscandroidkit OAuth 插件化兼容改造与跨项目验收](docs/CHANGESET_GSC_OAUTH_PLUGINIZATION.md)
 
 ## AI Agent 接入 Skill
 
@@ -79,8 +80,8 @@ python3 scripts/install-x2c-skill.py --tool codex --tool claude \
 - 完整 R2 namespace：覆盖当前编译器支持的 `id/layout/string/color/drawable/dimen/bool/integer/array/plurals/fraction`，不再生成重复的 `X2cIds`
 - values: `string`、literal `color`、`bool`、`integer`、`dimen`、`fraction`、`string-array`、`integer-array`、typed `array`、`plurals` 数据和 `<item type="id">`
 - color: `res/color` selector（完整状态集合、alpha、default-last）生成 `ColorStateList`
-- layout: 每个 `res/layout/*.xml` 都生成独立 factory，通过 `X2cModule` 注册到宿主 `x2c-runtime`；业务以自身 Class 自动发现模块，并通过 `X2cResources.setContentView/inflate` 使用布局
-- custom View/ViewGroup: 声明式构造策略、`<view class="...">`、类型化 setter/field、父容器 LayoutParams contract
+- layout: 每个 `res/layout/*.xml` 都生成独立 factory；本地 `<include>` 按 Android 的 id/visibility 与整组 LayoutParams 规则在编译期展开，并拒绝未知或拼错的 include-site 属性；业务以自身 Class 自动发现模块，并通过 `X2cResources.setContentView/inflate` 使用布局
+- custom View/ViewGroup: 声明式构造策略、`<view class="...">`、`frameworkBase` 属性继承、类型化 setter/field、父容器 LayoutParams contract
 - drawable: rectangle/oval/line/ring `shape`，支持 solid/gradient、四角半径、虚线 stroke、size、padding；状态 `selector` 支持淡入淡出、镜像、扩展 state 与内联 shape
 - drawable composition: `layer-list`、`inset`、`clip`、`scale`、`rotate`、`level-list`，统一执行未知引用、循环和异步 bitmap 混用检查
 - bitmap: plugin 模式把 PNG/JPEG/WebP/GIF/AVIF 转为 HTTPS CDN 元数据；normal 模式保留 AAR 位图并通过宿主 `Resources` 同步读取
@@ -94,11 +95,11 @@ python3 scripts/install-x2c-skill.py --tool codex --tool claude \
   analytics/账户/网络等业务依赖由 PluginClassLoader 自动回退到宿主 ClassLoader
 - 组件代理：四种 Activity launchMode、started/bound Service、normal/ordered Receiver、虚拟 ContentProvider 安全子集
 
-通用 View 属性覆盖：ID、宽高、weight、gravity、margin、padding、background/tint/foreground、visibility、enabled/click/focus/state、content description/tag/tooltip/transition、alpha/elevation/rotation/scale/translation/min size、layout direction、over-scroll 和常用 accessibility 属性。TextView 家族增加文本、hint、行数、字体样式、ellipsize、inputType/IME；ImageView 家族增加 src/scale/tint；CompoundButton、ProgressBar/SeekBar/RatingBar 也有对应 typed setter。
+通用 View 属性覆盖：ID、宽高、weight、gravity、margin、padding、background/tint/foreground、visibility、enabled/click/focus、content description/tag/tooltip/transition、alpha/elevation/rotation/scale/translation/min size、layout direction、over-scroll 和常用 accessibility 属性。TextView 家族增加文本、hint、行数、字体样式、ellipsize、inputType/IME、compound drawable/padding；plugin 模式的 CDN bitmap 不能同步作为 compound drawable，normal 模式本地 bitmap 则通过系统 Resources 读取。ImageView 家族增加 src/scale/tint；CompoundButton、ProgressBar/SeekBar/RatingBar 也有对应 typed setter。
 
 framework 静态 children 容器覆盖 `LinearLayout`、`FrameLayout`、`RelativeLayout`、`GridLayout`、`TableLayout/TableRow`、`RadioGroup`、两类 ScrollView、ViewAnimator 家族、Toolbar、ActionMenuView 及常见 framework 复合容器；分别生成真实的 Linear/Frame/Relative/Grid/Table/Radio/Toolbar/LayoutParams 和 Relative rule/Grid spec。`ListView`、`GridView`、`Spinner` 等 AdapterView 虽是 ViewGroup，但其 child 由 adapter 管理，因此作为 XML 静态父节点会明确失败。
 
-以下内容继续直接失败：resource qualifier、style/theme/styleable、vector/ripple/nine-patch/animated-vector、Data/View Binding、include/merge、Manifest 资源入口、重复 overlay 资源和未知标签/属性。它们需要 AAPT2 resource table、theme/configuration 或专用运行时协议，不能用普通 class 常量无损替代。
+以下插件自带资源内容继续直接失败：resource qualifier、style/theme/styleable、vector/ripple/nine-patch/animated-vector、Data/View Binding、`<merge>`、Manifest 资源入口、重复 overlay 资源和未知标签/属性。它们需要 AAPT2 resource table、theme/configuration 或专用运行时协议，不能用普通 class 常量无损替代。Activity 的宿主预埋真实 theme 是独立组件协议，不代表插件 style XML 已转为 class。
 
 `plurals` 生成显式 `Quantity` API，由调用方提供 CLDR quantity；它不会伪装成 `Resources.getQuantityString()` 的 locale 自动选择。`ring` 的显式 innerRadius/thickness 只在 `x2c.minApi >= 29` 时允许，因为更低版本没有对应 public API。
 
@@ -109,15 +110,15 @@ framework 静态 children 容器覆盖 `LinearLayout`、`FrameLayout`、`Relativ
 ```kotlin
 plugins {
     id("com.android.library") version "8.11.1"
-    id("dev.x2c.codegen") version "0.1.0-SNAPSHOT"
-    id("dev.x2c.activity-plugin") version "0.1.0-SNAPSHOT"
+    id("dev.x2c.codegen") version "0.2.0-SNAPSHOT"
+    id("dev.x2c.activity-plugin") version "0.2.0-SNAPSHOT"
 }
 
 dependencies {
     // 动态 plugin library 不把 runtime 打入 payload；宿主使用 implementation。
-    compileOnly("dev.x2c:x2c-runtime:0.1.0-SNAPSHOT")
-    compileOnly("dev.x2c:x2c-plugin-runtime:0.1.0-SNAPSHOT")
-    compileOnly("dev.x2c:x2c-plugin-base:0.1.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-runtime:0.2.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-plugin-runtime:0.2.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-plugin-base:0.2.0-SNAPSHOT")
     // 可选：较大业务 project 无需拆 module；只复制被入口继承的最小 base 转换单元。
     compileOnly(project(":business-base"))
 }
@@ -143,7 +144,7 @@ x2c {
 
 ```kotlin
 dependencies {
-    compileOnly("dev.x2c:x2c-plugin-api:0.1.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-plugin-api:0.2.0-SNAPSHOT")
 }
 ```
 
@@ -151,12 +152,38 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("dev.x2c:x2c-runtime:0.1.0-SNAPSHOT")
-    implementation("dev.x2c:x2c-plugin-loader:0.1.0-SNAPSHOT")
-    implementation("dev.x2c:x2c-plugin-runtime:0.1.0-SNAPSHOT")
-    implementation("dev.x2c:x2c-plugin-base:0.1.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-runtime:0.2.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-plugin-loader:0.2.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-plugin-runtime:0.2.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-plugin-base:0.2.0-SNAPSHOT")
 }
 ```
+
+插件宿主在真实 `Application` 中同时初始化 X2C 和不可变 Activity 主题表：
+
+```java
+X2C.init(
+        this,
+        PluginHostConfig.builder()
+                .defaultActivityTheme(R.style.HostPluginDefault)
+                .activityTheme("commerce.detail.light.v1", R.style.HostPluginCommerceDetail)
+                .activityTheme("video.home.dark.v1", "HostPluginVideoDark")
+                .build());
+```
+
+插件 Activity 只声明稳定 key，例如
+`@X2cPluginActivity(themeKey = "commerce.detail.light.v1")`，不携带宿主资源 ID。直接传
+`R.style` 是发布构建的首选；字符串重载只接受宿主本地 style entry，并在首次初始化时通过
+`getIdentifier(name, "style", hostPackage)` 解析一次。只被名称访问的 style 必须有宿主静态引用或
+`tools:keep`，避免 resource shrinker 删除。缺失 key、非 style 资源以及与固定容器不兼容的
+translucent/floating/NoDisplay/ActionBar 主题都会在插件安装或宿主初始化阶段明确失败。插件 Manifest
+仍不得声明 Activity theme。宿主主题应继承 `@style/X2cPluginContainer.Opaque`，并确保所有
+night/locale 等 qualifier 变体保持相同窗口结构；runtime 在每次实际应用主题前会按当前 Configuration
+重新校验结构，但不会重新执行名称查询。
+
+普通 AAR 模式不读取 `themeKey`：Activity 由 Android framework 原生创建，优先使用合并后 Manifest
+中 Activity 自身的 `android:theme`，未声明时才继承 application theme。因而同一份 Activity 源码可以
+保留插件注解，但 `pluginMode=false` 时注解只作为无运行时效果的编译标记。
 
 `BasePluginActivity/BasePluginService` 是插件 delegate 专用的宿主持有根，不是原生宿主组件的普通
 framework 基类。原生宿主 Activity 不能继承 `BasePluginActivity`；两端需要复用的业务逻辑应放在
@@ -176,7 +203,8 @@ analytics/账户/网络 SDK 不会因为 BaseActivity 的普通引用而自动�
 
 跨 ClassLoader 使用的类和成员应保持 `public`。宿主必须实际包含插件运行时需要的 compileOnly 依赖；
 否则首次解析该类或成员时会正常抛出 `ClassNotFoundException`、`NoClassDefFoundError` 或
-`NoSuchMethodError`。由于宿主 shrinker 无法看到服务端后发插件的调用，生产应用应自行提供相应 keep rules
+`NoSuchMethodError`。由于宿主 shrinker 无法看到服务端后发插件的调用，`x2c-plugin-runtime` 已通过
+consumer rules 保留 X2C 的动态 ABI；生产应用仍须为插件直接调用的宿主业务类和成员提供 keep rules
 和版本兼容策略。
 
 第一阶段会拒绝选中闭包中的 Android resources API、`R`/`TypedArray`、JNI、重复 class、宿主 X2C runtime
@@ -223,9 +251,11 @@ integer/dimen/fraction/array/drawable 若已由插件声明，始终使用插件
 标准 AAR/Resources 流程。宿主中只被动态名称访问的资源可能被 resource shrinker 删除，应通过宿主静态引用
 或 `tools:keep` 保留。
 
-当前宿主兜底是显式 runtime API：插件业务使用 `X2cResources.getString/getDrawable/...` 请求宿主独有名称。
-插件 XML 和 generated drawable 中的 `@type/name` 仍必须在插件资源模型内声明，未知引用会在构建期失败，避免
-把拼写错误静默解释成随宿主版本变化的资源依赖。
+当前宿主兜底有两个入口：插件业务使用 `X2cResources.getString/getDrawable/...` 请求宿主独有名称；
+plugin mode 的布局 XML 中，本地不存在的 string/color/bool/integer/dimen/drawable 会自动推断为宿主依赖。
+`report.json.inferredHostResources` 记录精确依赖集，模块初始化会在注册 provider/layout 前逐项验证当前宿主；
+缺失名称会立即终止模块加载。normal mode 不参与推断，未知引用仍在构建期失败。生成 drawable 内部引用也必须
+完全解析到插件资源模型，避免 drawable 图在不同宿主版本上改变语义。
 
 Gradle 插件会在 Android namespace 下生成 `x2c.X2cModuleBootstrap`。宿主已经加载插件入口类后，
 runtime 会沿入口类包路径找到 bootstrap、初始化内部 `X2cModule` 并返回不暴露模块名称的句柄：
@@ -238,7 +268,8 @@ X2cResources resources = X2C.loadModule(applicationContext, pluginEntry);
 bootstrap 必须和业务 anchor 来自同一个 ClassLoader，避免 plugin loader miss 后错误认领宿主模块。
 插件业务代码直接使用 `X2C.resources(MyPluginClass.class)`，无需声明 module name 或引用 generated 类。
 
-普通 AAR 不需要插件安装器，但宿主仍应在 `Application` 中只初始化一次 runtime；之后传入 Context 和
+普通 AAR 不需要插件安装器或插件主题表，但宿主仍使用同一个 `X2C.init(...)` 入口，并省略
+`PluginHostConfig`；之后传入 Context 和
 任意 library 业务类即可从应用 ClassLoader 按需初始化对应 module：
 
 ```java
@@ -399,6 +430,7 @@ value/drawable”分发表。plugin 模式由宿主 runtime 的 plugin-first wra
   "schema": 1,
   "views": [{
     "tag": "com.example.widget.StatusView",
+    "frameworkBase": "TextView",
     "constructor": "CONTEXT_ATTRS_DEF_STYLE",
     "attributes": [
       { "name": "label", "setter": "setLabel", "type": "STRING" },
@@ -408,6 +440,10 @@ value/drawable”分发表。plugin 模式由宿主 runtime 的 plugin-first wra
   }]
 }
 ```
+
+`frameworkBase` 可选，用于声明自定义类实际继承的受支持 framework View 类型；例如 `TextView` 会让生成器
+校验并生成 text、compound drawable 等 TextView 公共属性，同时仍直接构造原自定义类。它不是任意父类名，
+必须是当前 framework registry 中已支持的标签。
 
 构造策略：
 

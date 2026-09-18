@@ -2,6 +2,7 @@
     <application>
         <activity
             android:name="dev.x2c.fixture.producer.DemoActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:theme="@style/X2cProducerNormalManifestTheme" />
     </application>
 </manifest>

@@ -215,13 +215,46 @@ def check_components(report: Report, path: Path, activity_jar: Path) -> None:
     activities = data.get("activities")
     if isinstance(activities, list):
         per_mode: Dict[str, int] = {}
+        keyed = 0
+        defaults = 0
         for item in activities:
             if isinstance(item, dict):
                 launch_mode = str(item.get("launchMode"))
                 per_mode[launch_mode] = per_mode.get(launch_mode, 0) + 1
+                theme_key = item.get("themeKey")
+                if not isinstance(theme_key, str):
+                    report.add(
+                        "BLOCKER",
+                        "activity-theme-key",
+                        f"Activity {item.get('className')!r} is missing string themeKey metadata",
+                        str(path),
+                    )
+                elif theme_key and not re.fullmatch(
+                    r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", theme_key
+                ):
+                    report.add(
+                        "BLOCKER",
+                        "activity-theme-key",
+                        f"Activity {item.get('className')!r} has invalid themeKey {theme_key!r}",
+                        str(path),
+                    )
+                elif theme_key:
+                    keyed += 1
+                else:
+                    defaults += 1
         for launch_mode, count in per_mode.items():
             if count > 8:
                 report.add("BLOCKER", "activity-capacity", f"{launch_mode} has {count} distinct entries; process capacity is 8", str(path))
+        if not any(
+            item["code"] == "activity-theme-key" and item["severity"] == "BLOCKER"
+            for item in report.items
+        ):
+            report.add(
+                "PASS",
+                "activity-theme-key",
+                f"Activity metadata contains {keyed} keyed and {defaults} default-theme entry/entries",
+                str(path),
+            )
     services = data.get("services")
     if isinstance(services, list) and len(services) > 8:
         report.add("BLOCKER", "service-capacity", f"Component report contains {len(services)} Services; capacity is 8", str(path))
@@ -264,6 +297,25 @@ def check_normal(report: Report, module_dir: Path, variant: str, enabled: str, a
             report.add("PASS", f"aar-{required.lower()}", f"AAR contains {required}", str(aar))
         else:
             report.add("BLOCKER", f"aar-{required.lower()}", f"AAR is missing {required}", str(aar))
+    try:
+        with zipfile.ZipFile(aar) as archive:
+            manifest = archive.read("AndroidManifest.xml").decode("utf-8", errors="replace")
+    except (OSError, KeyError, zipfile.BadZipFile) as error:
+        report.add("BLOCKER", "normal-manifest-theme", f"Cannot inspect AAR Manifest: {error}", str(aar))
+    else:
+        activities = re.findall(r"<activity\b([^>]*)>", manifest, re.DOTALL)
+        if activities:
+            explicit = sum(
+                bool(re.search(r"\bandroid:theme\s*=", declaration))
+                for declaration in activities
+            )
+            report.add(
+                "PASS",
+                "normal-manifest-theme",
+                f"AAR retains {explicit} explicit Activity theme(s); "
+                f"{len(activities) - explicit} Activity entry/entries inherit the application theme",
+                str(aar),
+            )
     source_has_res = any(path.is_file() for path in (module_dir / "src").glob("*/res/**/*")) if (module_dir / "src").is_dir() else False
     packaged_res = any(name == "res/" or name.startswith("res/") for name in names)
     if source_has_res and not packaged_res:

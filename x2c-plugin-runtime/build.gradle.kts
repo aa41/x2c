@@ -3,15 +3,13 @@ plugins {
     `maven-publish`
 }
 
-group = "dev.x2c"
-version = "0.1.0-SNAPSHOT"
-
 android {
     namespace = "dev.x2c.plugin.runtime"
     compileSdk = 36
 
     defaultConfig {
         minSdk = 21
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     compileOptions {

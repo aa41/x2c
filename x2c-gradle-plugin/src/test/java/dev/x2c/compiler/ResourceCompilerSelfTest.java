@@ -44,10 +44,37 @@ public final class ResourceCompilerSelfTest {
     tests.run(
         "emitsCustomViewConstructorsAndCommonProperties",
         tests::emitsCustomViewConstructorsAndCommonProperties);
+    tests.run(
+        "compilesLayoutInflaterCompatibleInclude",
+        tests::compilesLayoutInflaterCompatibleInclude);
+    tests.run("rejectsUnsupportedIncludeAttribute", tests::rejectsUnsupportedIncludeAttribute);
+    tests.run("rejectsCyclicLayoutIncludes", tests::rejectsCyclicLayoutIncludes);
+    tests.run(
+        "generatesParentAwareRootLayoutParams",
+        tests::generatesParentAwareRootLayoutParams);
+    tests.run(
+        "inheritsFrameworkBehaviorForCustomViews",
+        tests::inheritsFrameworkBehaviorForCustomViews);
+    tests.run(
+        "infersHostResourcesInPluginLayouts",
+        tests::infersHostResourcesInPluginLayouts);
+    tests.run("emitsRuntimeHostBooleanRules", tests::emitsRuntimeHostBooleanRules);
+    tests.run(
+        "rejectsHostResourcesInsideGeneratedDrawables",
+        tests::rejectsHostResourcesInsideGeneratedDrawables);
+    tests.run(
+        "rejectsUnknownResourcesInNormalLayouts",
+        tests::rejectsUnknownResourcesInNormalLayouts);
     tests.run("rejectsInvalidScrollbarFlags", tests::rejectsInvalidScrollbarFlags);
     tests.run(
         "supportsGenericAndCustomLayoutParamsViewGroups",
         tests::supportsGenericAndCustomLayoutParamsViewGroups);
+    tests.run(
+        "rejectsAmbiguousFrameworkAndCustomContainerContracts",
+        tests::rejectsAmbiguousFrameworkAndCustomContainerContracts);
+    tests.run(
+        "normalizesBlankFrameworkBase",
+        tests::normalizesBlankFrameworkBase);
     tests.run(
         "rejectsUndeclaredLayoutParamsAttribute", tests::rejectsUndeclaredLayoutParamsAttribute);
     tests.run("rejectsInvalidContainerContract", tests::rejectsInvalidContainerContract);
@@ -60,6 +87,15 @@ public final class ResourceCompilerSelfTest {
     tests.run("rejectsDrawableKindCollision", tests::rejectsDrawableKindCollision);
     tests.run("compilesDrawableSelector", tests::compilesDrawableSelector);
     tests.run("rejectsBitmapInsideDrawableSelector", tests::rejectsBitmapInsideDrawableSelector);
+    tests.run(
+        "rejectsPluginBitmapCompoundDrawable",
+        tests::rejectsPluginBitmapCompoundDrawable);
+    tests.run(
+        "compilesNormalBitmapCompoundDrawable",
+        tests::compilesNormalBitmapCompoundDrawable);
+    tests.run(
+        "prefersPluginDrawableOverHostFallback",
+        tests::prefersPluginDrawableOverHostFallback);
     tests.run("rejectsCyclicDrawableSelector", tests::rejectsCyclicDrawableSelector);
     tests.run("rejectsInvalidBitmapSignature", tests::rejectsInvalidBitmapSignature);
     tests.run("rejectsUnregisteredCustomView", tests::rejectsUnregisteredCustomView);
@@ -73,7 +109,7 @@ public final class ResourceCompilerSelfTest {
     tests.run("verifiesBitmapDigestAgainstLock", tests::verifiesBitmapDigestAgainstLock);
     tests.run("rejectsManifestComponents", tests::rejectsManifestComponents);
     tests.run("allowsManifestComponentsInNormalMode", tests::allowsManifestComponentsInNormalMode);
-    System.out.println("ResourceCompilerSelfTest: 38 tests passed");
+    System.out.println("ResourceCompilerSelfTest: 52 tests passed");
   }
 
   private void run(String name, ThrowingRunnable test) throws Exception {
@@ -321,9 +357,13 @@ public final class ResourceCompilerSelfTest {
     String provider = Files.readString(generated.resolve("X2cResourceProviderImpl.java"));
     for (String name : List.of("activity_main", "dialog_account", "row_profile")) {
       assertContains(layouts, "public static View " + name + "(Context context)");
+      assertContains(
+          layouts, "public static View " + name + "(Context context, ViewGroup parent)");
       assertContains(r2, "public static final int " + name + " = 0x7E");
       assertContains(module, "X2C.registerLayout(NAME, \"" + name + "\", R2.layout." + name);
       assertContains(module, "return X2cLayouts." + name + "(factoryContext)");
+      assertContains(
+          module, "return X2cLayouts." + name + "(factoryContext, parent)");
       assertContains(provider, "case \"" + name + "\": return R2.layout." + name);
     }
     assertContains(module, "X2cResourceProvider created = X2C.createPluginResourceProvider(");
@@ -785,6 +825,320 @@ public final class ResourceCompilerSelfTest {
         Files.readString(temporaryDirectory.resolve("report/report.json")), "\"customViews\": 3");
   }
 
+  private void compilesLayoutInflaterCompatibleInclude() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    write(
+        res.resolve("layout/title.xml"),
+        """
+        <TextView xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="120dp"
+            android:layout_height="40dp"
+            android:layout_margin="6dp"
+            android:layout_gravity="bottom"
+            android:text="included" />
+        """);
+    write(
+        res.resolve("layout/screen.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="320dp" android:layout_height="252dp">
+            <include
+                layout="@layout/title"
+                android:id="@+id/included_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top"
+                android:text="must_be_ignored"
+                android:visibility="gone" />
+            <include
+                layout="@layout/title"
+                android:id="@+id/fallback_title"
+                android:layout_width="match_parent"
+                android:text="also_ignored" />
+        </FrameLayout>
+        """);
+
+    compile(res, null);
+
+    String layout =
+        Files.readString(temporaryDirectory.resolve("generated/sample/generated/X2cLayouts.java"));
+    assertContains(layout, "view1.setId(R2.id.included_title)");
+    assertContains(layout, "view1.setVisibility(View.GONE)");
+    assertContains(layout, "view1Params.gravity = Gravity.TOP");
+    assertContains(layout, "view1.setText(\"included\")");
+    assertContains(layout, "view2.setId(R2.id.fallback_title)");
+    assertContains(layout, "view2.setText(\"included\")");
+    assertContains(layout, "view2Params.gravity = Gravity.BOTTOM");
+    assertContains(layout, "view2Params.setMargins(Math.round(TypedValue.applyDimension(");
+    assertNotContains(layout, "must_be_ignored");
+    assertNotContains(layout, "also_ignored");
+  }
+
+  private void rejectsUnsupportedIncludeAttribute() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    write(
+        res.resolve("layout/title.xml"),
+        """
+        <TextView xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="included" />
+        """);
+    write(
+        res.resolve("layout/screen.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent" android:layout_height="match_parent">
+            <include layout="@layout/title" android:visiblity="gone" />
+        </FrameLayout>
+        """);
+
+    assertContains(
+        expectFailure(() -> compile(res, null)).getMessage(),
+        "Unsupported attribute on <include>: android:visiblity");
+  }
+
+  private void generatesParentAwareRootLayoutParams() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    write(
+        res.resolve("layout/screen.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent"
+            android:layout_height="252dp" />
+        """);
+
+    compile(res, null);
+
+    String layout =
+        Files.readString(temporaryDirectory.resolve("generated/sample/generated/X2cLayouts.java"));
+    assertContains(layout, "public static View screen(Context context, ViewGroup parent)");
+    assertContains(layout, "view0.setLayoutParams(new ViewGroup.LayoutParams(");
+
+    write(
+        res.resolve("layout/screen.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent"
+            android:layout_height="252dp"
+            android:layout_gravity="center"
+            android:layout_margin="8dp" />
+        """);
+    compile(res, null);
+    layout = Files.readString(temporaryDirectory.resolve("generated/sample/generated/X2cLayouts.java"));
+    assertContains(layout, "else if (parent instanceof FrameLayout)");
+    assertContains(layout, "FrameLayout.LayoutParams view0Params");
+    assertContains(layout, "view0Params.gravity = Gravity.CENTER");
+    assertContains(layout, "view0Params.setMargins(Math.round(TypedValue.applyDimension(");
+    assertContains(layout, "view0.setLayoutParams(view0Params)");
+  }
+
+  private void rejectsCyclicLayoutIncludes() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    write(
+        res.resolve("layout/first.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent" android:layout_height="match_parent">
+            <include layout="@layout/second"
+                android:layout_width="match_parent" android:layout_height="match_parent" />
+        </FrameLayout>
+        """);
+    write(
+        res.resolve("layout/second.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent" android:layout_height="match_parent">
+            <include layout="@layout/first"
+                android:layout_width="match_parent" android:layout_height="match_parent" />
+        </FrameLayout>
+        """);
+
+    assertContains(
+        expectFailure(() -> compile(res, null)).getMessage(),
+        "Cyclic <include> layout reference");
+  }
+
+  private void inheritsFrameworkBehaviorForCustomViews() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    write(
+        res.resolve("values/content.xml"),
+        """
+        <resources>
+            <string name="label">Custom label</string>
+            <color name="accent">#ff00ff</color>
+            <dimen name="icon_gap">6dp</dimen>
+        </resources>
+        """);
+    write(
+        res.resolve("drawable/icon.xml"),
+        """
+        <shape xmlns:android="http://schemas.android.com/apk/res/android">
+            <solid android:color="@color/accent" />
+            <size android:width="8dp" android:height="8dp" />
+        </shape>
+        """);
+    write(
+        res.resolve("layout/screen.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent" android:layout_height="match_parent">
+            <sample.LabelView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:drawableStart="@drawable/icon"
+                android:drawablePadding="@dimen/icon_gap"
+                android:text="@string/label"
+                android:textColor="@color/accent" />
+        </FrameLayout>
+        """);
+    Path customViews = temporaryDirectory.resolve("custom-views.json");
+    write(
+        customViews,
+        """
+        {
+          "schema": 1,
+          "views": [{
+            "tag": "sample.LabelView",
+            "frameworkBase": "TextView",
+            "constructor": "CONTEXT"
+          }]
+        }
+        """);
+
+    compile(res, null, customViews);
+
+    String layout =
+        Files.readString(temporaryDirectory.resolve("generated/sample/generated/X2cLayouts.java"));
+    assertContains(layout, "sample.LabelView view1 = new sample.LabelView(context)");
+    assertContains(layout, "view1.setText(X2cModule.provider().getString(\"label\"))");
+    assertContains(layout, "view1.setCompoundDrawablesRelativeWithIntrinsicBounds(");
+    assertContains(layout, "X2cModule.provider().getDrawable(context, \"icon\")");
+    assertContains(layout, "view1.setCompoundDrawablePadding(Math.round(");
+  }
+
+  private void infersHostResourcesInPluginLayouts() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    write(
+        res.resolve("layout/screen.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="@dimen/host_width"
+            android:layout_height="wrap_content"
+            android:background="@drawable/host_panel">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/host_title"
+                android:textColor="@color/host_text" />
+        </FrameLayout>
+        """);
+    compile(res, null, null, true);
+
+    String layout =
+        Files.readString(temporaryDirectory.resolve("generated/sample/generated/X2cLayouts.java"));
+    assertContains(layout, "X2cModule.provider().getDimension(context, \"host_width\")");
+    assertContains(layout, "X2cModule.provider().getDrawable(context, \"host_panel\")");
+    assertContains(layout, "X2cModule.provider().getString(\"host_title\")");
+    assertContains(layout, "X2cModule.provider().getColorStateList(\"host_text\")");
+    String report = Files.readString(temporaryDirectory.resolve("report/report.json"));
+    assertContains(report, "\"inferredHostResources\": 4");
+    assertContains(report, "\"host-resource-dependencies=inferred-and-preflighted\"");
+    assertNotContains(report, "declaredHostResources");
+    assertNotContains(report, "usedHostResources");
+    String module =
+        Files.readString(temporaryDirectory.resolve("generated/sample/generated/X2cModule.java"));
+    assertContains(module, "created.getIdentifier(\"string\", \"host_title\")");
+    assertContains(module, "created.getIdentifier(\"drawable\", \"host_panel\")");
+  }
+
+  private void emitsRuntimeHostBooleanRules() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    write(
+        res.resolve("layout/screen.xml"),
+        """
+        <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent" android:layout_height="match_parent">
+            <View android:layout_width="1dp" android:layout_height="1dp"
+                android:layout_centerInParent="@bool/host_center" />
+        </RelativeLayout>
+        """);
+    compile(res, null, null, true);
+    String layout =
+        Files.readString(temporaryDirectory.resolve("generated/sample/generated/X2cLayouts.java"));
+    assertContains(layout, "if (X2cModule.provider().getBoolean(\"host_center\"))");
+    assertContains(layout, "view1Params.addRule(RelativeLayout.CENTER_IN_PARENT)");
+  }
+
+  private void rejectsAmbiguousFrameworkAndCustomContainerContracts() throws Exception {
+    Path customViews = temporaryDirectory.resolve("custom-views.json");
+    write(
+        customViews,
+        """
+        {
+          "schema": 1,
+          "views": [{
+            "tag": "sample.CustomLayout",
+            "frameworkBase": "LinearLayout",
+            "constructor": "CONTEXT",
+            "container": {}
+          }]
+        }
+        """);
+    assertContains(
+        expectFailure(
+                () -> compile(temporaryDirectory.resolve("res"), null, customViews))
+            .getMessage(),
+        "frameworkBase and container cannot be combined");
+  }
+
+  private void normalizesBlankFrameworkBase() throws Exception {
+    Path customViews = temporaryDirectory.resolve("custom-views.json");
+    write(
+        customViews,
+        """
+        {
+          "schema": 1,
+          "views": [{
+            "tag": "sample.CustomLayout",
+            "frameworkBase": "   ",
+            "container": {}
+          }]
+        }
+        """);
+
+    compile(temporaryDirectory.resolve("res"), null, customViews);
+  }
+
+  private void rejectsUnknownResourcesInNormalLayouts() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    write(
+        res.resolve("layout/screen.xml"),
+        """
+        <TextView xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/host_title" />
+        """);
+    assertContains(
+        expectFailure(() -> compile(res, null, null, false)).getMessage(),
+        "Unknown string reference: @string/host_title");
+  }
+
+  private void rejectsHostResourcesInsideGeneratedDrawables() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    write(
+        res.resolve("drawable/panel.xml"),
+        """
+        <shape xmlns:android="http://schemas.android.com/apk/res/android">
+            <solid android:color="@color/host_panel_color" />
+        </shape>
+        """);
+    assertContains(
+        expectFailure(() -> compile(res, null, null, true)).getMessage(),
+        "Unknown color reference: @color/host_panel_color");
+  }
+
   private void rejectsInvalidScrollbarFlags() throws Exception {
     Path res = temporaryDirectory.resolve("res");
     write(
@@ -828,6 +1182,18 @@ public final class ResourceCompilerSelfTest {
             </sample.GenericGroup>
         </sample.FlowLayout>
         """);
+    write(
+        res.resolve("layout/piece.xml"),
+        """
+        <TextView xmlns:android="http://schemas.android.com/apk/res/android"
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="4dp"
+            app:layout_pinned="true"
+            app:layout_span="@integer/span"
+            android:text="detached custom child" />
+        """);
     Path customViews = temporaryDirectory.resolve("custom-views.json");
     write(
         customViews,
@@ -870,6 +1236,10 @@ public final class ResourceCompilerSelfTest {
         "android.view.ViewGroup.LayoutParams view2Params = new"
             + " android.view.ViewGroup.LayoutParams(");
     assertContains(layout, "view0.onX2cChildrenReady()");
+    assertContains(layout, "else if (parent instanceof sample.FlowLayout)");
+    assertContains(layout, "sample.FlowLayout.LayoutParams view0Params");
+    assertContains(layout, "view0Params.setPinned(true)");
+    assertContains(layout, "view0Params.span = X2cModule.provider().getInteger(\"span\")");
     assertBefore(layout, "view1.addView(view2, view2Params)", "view0.addView(view1, view1Params)");
     assertBefore(layout, "view0.addView(view1, view1Params)", "view0.onX2cChildrenReady()");
   }
@@ -1106,6 +1476,88 @@ public final class ResourceCompilerSelfTest {
     assertContains(
         expectFailure(() -> compile(res, null)).getMessage(),
         "Drawable selector cannot synchronously include CDN bitmap: @drawable/hero");
+  }
+
+  private void rejectsPluginBitmapCompoundDrawable() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    writePng(res.resolve("drawable/icon.png"));
+    write(
+        res.resolve("layout/content.xml"),
+        """
+        <TextView xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawableStart="@drawable/icon"
+            android:text="Plugin bitmap" />
+        """);
+
+    assertContains(
+        expectFailure(() -> compile(res, null)).getMessage(),
+        "CDN bitmap cannot be used as a synchronous TextView compound drawable: @drawable/icon");
+  }
+
+  private void compilesNormalBitmapCompoundDrawable() throws Exception {
+    Path res = temporaryDirectory.resolve("res");
+    writePng(res.resolve("drawable/icon.png"));
+    write(
+        res.resolve("layout/content.xml"),
+        """
+        <TextView xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawableStart="@drawable/icon"
+            android:text="Normal bitmap" />
+        """);
+
+    compile(res, null, null, false);
+
+    String layout =
+        Files.readString(temporaryDirectory.resolve("generated/sample/generated/X2cLayouts.java"));
+    assertContains(
+        layout,
+        "context.getResources().getDrawable(X2cModule.identifier(\"drawable\", \"icon\"),"
+            + " context.getTheme())");
+    assertNotContains(layout, "X2cDrawables.icon(context)");
+  }
+
+  private void prefersPluginDrawableOverHostFallback() throws Exception {
+    Path shapeRes = temporaryDirectory.resolve("shape-res");
+    write(
+        shapeRes.resolve("values/colors.xml"),
+        "<resources><color name=\"panel\">#336699</color></resources>");
+    write(
+        shapeRes.resolve("drawable/shared.xml"),
+        """
+        <shape xmlns:android="http://schemas.android.com/apk/res/android">
+            <solid android:color="@color/panel" />
+        </shape>
+        """);
+    write(
+        shapeRes.resolve("layout/content.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/shared" />
+        """);
+
+    compile(shapeRes, null, null, true);
+    String report = Files.readString(temporaryDirectory.resolve("report/report.json"));
+    assertContains(report, "\"inferredHostResources\": 0");
+
+    Path bitmapRes = temporaryDirectory.resolve("bitmap-res");
+    writePng(bitmapRes.resolve("drawable/shared.png"));
+    write(
+        bitmapRes.resolve("layout/content.xml"),
+        """
+        <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/shared" />
+        """);
+    assertContains(
+        expectFailure(() -> compile(bitmapRes, null, null, true)).getMessage(),
+        "Expected a synchronous generated drawable, got: @drawable/shared");
   }
 
   private void rejectsCyclicDrawableSelector() throws Exception {
@@ -1398,6 +1850,12 @@ public final class ResourceCompilerSelfTest {
   private static void assertContains(String value, String expected) {
     if (!value.contains(expected)) {
       throw new AssertionError("Expected value to contain '" + expected + "': " + value);
+    }
+  }
+
+  private static void assertNotContains(String value, String unexpected) {
+    if (value.contains(unexpected)) {
+      throw new AssertionError("Expected value not to contain '" + unexpected + "': " + value);
     }
   }
 

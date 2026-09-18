@@ -3,9 +3,6 @@ plugins {
     `maven-publish`
 }
 
-group = "dev.x2c"
-version = "0.1.0-SNAPSHOT"
-
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(17))
     withSourcesJar()

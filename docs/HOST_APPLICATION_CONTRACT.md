@@ -4,9 +4,37 @@ JAR 插件没有独立 Application。插件 Context 的 `getApplicationContext()
 
 ## 初始化
 
-在真实 Application 的 `onCreate()` 中，或加固 SDK 明确通知宿主环境就绪后调用 `X2C.init(this)`，然后再安装插件。自动 Provider 不提前绑定 runtime。需要在 Application.onCreate 之前访问 X2C 的原生 Provider 必须由宿主另行安排真实 Application 就绪后的初始化时序。
+在真实 Application 的 `onCreate()` 中，或加固 SDK 明确通知宿主环境就绪后调用
+`X2C.init(this, hostConfig)`，然后再安装插件。自动 Provider 不提前绑定 runtime。需要在
+Application.onCreate 之前访问 X2C 的原生 Provider 必须由宿主另行安排真实 Application 就绪后的初始化时序。
 
-代理加载器可使用 `X2C.init(realApplication, stableHostLoader)`。加载器必须能够解析同一份 X2C 共享类型；重复绑定同一 Application/加载器允许，不同对象则报错且不改变已有状态。这里不 Hook SDK，也不会自动检测 SDK 的加固完成时间。初始化后宿主必须保持应用环境稳定，各进程分别初始化。
+```java
+X2C.init(
+        this,
+        PluginHostConfig.builder()
+                .defaultActivityTheme(R.style.HostPluginDefault)
+                .activityTheme("commerce.detail.light.v1", R.style.HostPluginCommerceDetail)
+                .activityTheme("video.home.dark.v1", "HostPluginVideoDark")
+                .build());
+```
+
+配置构建后不可变。Activity payload 只保存稳定 `themeKey`；安装时必须能从宿主表解析到真实 style ID。
+直接 `R.style` 注册优先；字符串注册只允许宿主本地 style entry，并仅在首次初始化时调用一次
+`Resources.getIdentifier(name, "style", hostPackage)`。名称解析的 style 在开启资源裁剪时需要静态引用或
+`tools:keep`。缺少默认/keyed 主题、名称不存在、ID 不是 style，或主题改变固定容器的
+translucent/floating/NoDisplay/ActionBar 结构都会 fail closed。插件 Manifest 中的 Activity theme 不参与协议。
+宿主主题推荐直接继承 `@style/X2cPluginContainer.Opaque`，并让全部 qualifier 变体保持相同窗口结构。
+style ID 只解析一次；runtime 会在每次真正应用主题前按当前 Configuration 重新检查结构属性。
+
+主题来源严格按组件创建模式隔离：normal AAR Activity 只使用合并后 Manifest 中自身的
+`android:theme`，未声明时继承 application theme；即使源码保留 `@X2cPluginActivity`，其
+`themeKey` 也不生效。动态插件 Activity 不读取插件 Manifest，只使用 `themeKey` 和上述宿主主题表。
+同一宿主 APK 同时包含 normal AAR 与动态插件时，这两条规则仍互不覆盖。
+
+重复传入同一 Application 和等值配置是幂等操作，不会重新查询资源；不同 Application 或不同配置会报错且
+不会改变已发布的不可变主题表。normal AAR 模式不需要 `PluginHostConfig`，继续单独调用 `X2C.init(...)`。
+
+代理加载器可使用 `X2C.init(realApplication, stableHostLoader, hostConfig)`。加载器必须能够解析同一份 X2C 共享类型；重复绑定同一 Application/加载器允许，不同对象则报错且不改变已有状态。这里不 Hook SDK，也不会自动检测 SDK 的加固完成时间。初始化后宿主必须保持应用环境稳定，各进程分别初始化。
 
 ## 代码身份
 
@@ -23,4 +51,8 @@ JAR 插件没有独立 Application。插件 Context 的 `getApplicationContext()
 
 ## 版本兼容
 
-该变化属于行为契约升级，组件 runtime ABI 提升为 2。ABI 1 载荷会被现有安装检查拒绝，需使用新编译插件重新构建，不应跳过 ABI 检查。仍需针对具体加固产品验证 DEX 加载、组件、资源重命名等策略，普通设备回归不是厂商兼容认证。
+Application/ClassLoader 身份契约引入时组件 runtime ABI 提升为 2。receiver-aware final Activity API bridge
+和 `setFinishOnTouchOutside` 容器转发曾把协议提升为 3；宿主主题 key/metadata 契约进一步将当前 ABI
+提升为 4。ABI 1/2/3 载荷会被
+现有安装检查拒绝，需使用新编译插件重新构建，不应跳过 ABI 检查。仍需针对具体加固产品验证 DEX 加载、
+组件、资源重命名等策略，普通设备回归不是厂商兼容认证。

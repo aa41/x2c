@@ -31,6 +31,7 @@ final class ActivityRegistryGenerator {
         emitPluginId(writer, pluginId);
         emitContains(writer, activities);
         emitInfo(writer, activities);
+        emitActivities(writer, activities);
         emitCreate(writer, activities);
         emitComponentContains(writer, "containsService", services);
         emitComponentCreate(writer, "createService", "android/app/Service", services);
@@ -100,18 +101,47 @@ final class ActivityRegistryGenerator {
         for (TransformedActivity activity : activities) {
             Label next = new Label();
             emitNameEquals(method, activity.className, next);
-            method.visitTypeInsn(Opcodes.NEW, INFO);
-            method.visitInsn(Opcodes.DUP);
-            method.visitLdcInsn(activity.className);
-            method.visitFieldInsn(Opcodes.GETSTATIC, MODE, activity.launchMode, "L" + MODE + ";");
-            method.visitMethodInsn(Opcodes.INVOKESPECIAL, INFO, "<init>",
-                    "(Ljava/lang/String;L" + MODE + ";)V", false);
+            emitActivityInfo(method, activity);
             method.visitInsn(Opcodes.ARETURN);
             method.visitLabel(next);
         }
         emitUnknown(method, "Activity");
         method.visitMaxs(0, 0);
         method.visitEnd();
+    }
+
+    private static void emitActivities(
+            ClassWriter writer, List<TransformedActivity> activities) {
+        MethodVisitor method = writer.visitMethod(
+                Opcodes.ACC_PUBLIC, "activities", "()[L" + INFO + ";", null, null);
+        method.visitCode();
+        pushInt(method, activities.size());
+        method.visitTypeInsn(Opcodes.ANEWARRAY, INFO);
+        for (int index = 0; index < activities.size(); index++) {
+            method.visitInsn(Opcodes.DUP);
+            pushInt(method, index);
+            emitActivityInfo(method, activities.get(index));
+            method.visitInsn(Opcodes.AASTORE);
+        }
+        method.visitInsn(Opcodes.ARETURN);
+        method.visitMaxs(0, 0);
+        method.visitEnd();
+    }
+
+    private static void emitActivityInfo(
+            MethodVisitor method, TransformedActivity activity) {
+        method.visitTypeInsn(Opcodes.NEW, INFO);
+        method.visitInsn(Opcodes.DUP);
+        method.visitLdcInsn(activity.className);
+        method.visitFieldInsn(
+                Opcodes.GETSTATIC, MODE, activity.launchMode, "L" + MODE + ";");
+        method.visitLdcInsn(activity.themeKey);
+        method.visitMethodInsn(
+                Opcodes.INVOKESPECIAL,
+                INFO,
+                "<init>",
+                "(Ljava/lang/String;L" + MODE + ";Ljava/lang/String;)V",
+                false);
     }
 
     private static void emitCreate(ClassWriter writer, List<TransformedActivity> activities) {

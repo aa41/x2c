@@ -3,9 +3,6 @@ plugins {
     `maven-publish`
 }
 
-group = "dev.x2c"
-version = "0.1.0-SNAPSHOT"
-
 android {
     namespace = "dev.x2c.plugin.base"
     compileSdk = 36

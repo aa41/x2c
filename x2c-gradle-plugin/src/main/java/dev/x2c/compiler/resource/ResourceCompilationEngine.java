@@ -50,7 +50,11 @@ public final class ResourceCompilationEngine {
         recreateDirectory(sourceOutput.toPath());
         recreateDirectory(reportOutput.toPath());
 
-        Model model = new Model(CustomViewRegistry.load(customViewsFile), minApi);
+        Model model = new Model(
+                CustomViewRegistry.load(customViewsFile),
+                HostResourceDependencies.disabled(),
+                minApi,
+                pluginMode);
         List<File> uniqueRoots = canonicalRoots(resourceRoots);
         List<ResourceFile> files = discover(uniqueRoots);
         for (ResourceFile file : files) {
@@ -74,6 +78,20 @@ public final class ResourceCompilationEngine {
             }
         }
         validateDrawableGraph(model);
+        // Host resource dependencies are intentionally visible only while parsing layouts.
+        // Plugin-owned values and generated drawables must remain fully self-contained.
+        if (pluginMode) {
+            model.hostResources = HostResourceDependencies.inferred();
+        }
+        for (ResourceFile file : files) {
+            if (file.kind.equals("layout")) {
+                String name = XmlSupport.resourceNameFromFile(file.file);
+                if (model.layoutFiles.putIfAbsent(name, file) != null) {
+                    throw new ResourceCompilationException(
+                            file.file.getAbsolutePath() + ": Duplicate layout resource: " + name);
+                }
+            }
+        }
         for (ResourceFile file : files) {
             if (file.kind.equals("layout")) {
                 collectLayoutIdDeclarations(file, model);

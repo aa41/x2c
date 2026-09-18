@@ -134,7 +134,9 @@ public abstract class TransformPluginActivitiesTask extends DefaultTask {
         for (int index = 0; index < result.activities.size(); index++) {
             TransformedActivity activity = result.activities.get(index);
             json.append("    {\"className\": \"").append(escape(activity.className))
-                    .append("\", \"launchMode\": \"").append(activity.launchMode).append("\"}");
+                    .append("\", \"launchMode\": \"").append(activity.launchMode)
+                    .append("\", \"themeKey\": \"").append(escape(activity.themeKey))
+                    .append("\"}");
             if (index + 1 < result.activities.size()) json.append(',');
             json.append('\n');
         }

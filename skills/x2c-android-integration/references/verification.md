@@ -53,6 +53,11 @@ At minimum verify on a cold process:
   before ClassLoader creation;
 - runtime classes resolve from the host loader while plugin entries resolve from their own loader;
 - `X2C.hostApplication()` is the real Application and initialization ran once;
+- every Activity entry in `activities.json` has the expected `themeKey`; every non-empty key and
+  the default path are registered in `PluginHostConfig`; the resolved host styles survive resource
+  shrinking and keep the required opaque/no-ActionBar window structure;
+- plugin launch visibly applies the selected host style before delegate `onCreate`, while plugin
+  Manifest Activity/theme declarations remain absent;
 - two plugin IDs/generated packages can install sequentially without module/resource collision;
 - plugin-declared resources win, host-only supported resources fall back, synthetic IDs work with
   `findViewById` and keyed tags, and CDN images pass integrity checks;
@@ -68,6 +73,11 @@ path, and relevant crash/log excerpts. Avoid sending input to an unspecified con
 ## Normal host checks
 
 - inspect the AAR and merged host Manifest/resources;
+- confirm the merged Activity declaration has the intended `android:theme` and that a runtime
+  theme attribute resolves from it; when no Activity theme is declared, confirm Android inherits
+  the application theme;
+- if common source retains `@X2cPluginActivity(themeKey=...)`, prove that changing the key does not
+  affect the native normal Activity;
 - exercise native inflate with Activity theme, configuration changes, locale/night/density variants,
   local drawable loading, and any `<merge>` layout when generation is disabled;
 - verify resource shrinking preserves dynamically named layouts/values/drawables;

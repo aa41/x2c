@@ -24,24 +24,26 @@ final class LayoutEmitter {
     this.pluginMode = pluginMode;
   }
 
-  String emit(LayoutNode node, LayoutNode parentNode, String parentVariable) {
+  String emitRoot(LayoutNode node, String runtimeParentVariable) {
+    return emit(node, null, null, runtimeParentVariable);
+  }
+
+  private String emit(
+      LayoutNode node,
+      LayoutNode parentNode,
+      String parentVariable,
+      String runtimeParentVariable) {
     String variable = "view" + nextId++;
     out.line(node.javaType + " " + variable + " = " + constructorExpression(node) + ";");
     applyProperties(node, variable);
     String params = null;
     if (parentNode == null) {
-      out.line(
-          variable
-              + ".setLayoutParams(new ViewGroup.LayoutParams("
-              + sizeExpression(node.attributes.get("layout_width"))
-              + ", "
-              + sizeExpression(node.attributes.get("layout_height"))
-              + "));");
+      emitRootLayoutParams(node, variable, runtimeParentVariable);
     } else {
       params = emitLayoutParams(node, parentNode, variable);
     }
     for (LayoutNode child : node.children) {
-      emit(child, node, variable);
+      emit(child, node, variable, null);
     }
     if (node.tag.equals("RadioGroup") && node.attributes.containsKey("checkedButton")) {
       out.line(variable + ".check(" + idExpression(node.attributes.get("checkedButton")) + ");");
@@ -55,13 +57,104 @@ final class LayoutEmitter {
     return variable;
   }
 
+  private void emitRootLayoutParams(
+      LayoutNode node, String variable, String runtimeParentVariable) {
+    if (runtimeParentVariable == null) {
+      emitGenericRootLayoutParams(node, variable);
+      return;
+    }
+    out.open("if (" + runtimeParentVariable + " == null)");
+    emitGenericRootLayoutParams(node, variable);
+    out.close();
+    for (CustomViewRegistry.ViewSpec parent : model.customViews.containerViews()) {
+      out.open("else if (" + runtimeParentVariable + " instanceof " + parent.className() + ")");
+      String params = emitCustomLayoutParams(node, parent, variable);
+      out.line(variable + ".setLayoutParams(" + params + ");");
+      out.close();
+    }
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "ActionMenuView", FrameworkParentKind.ACTION_MENU);
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "TableLayout", FrameworkParentKind.TABLE);
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "TableRow", FrameworkParentKind.TABLE_ROW);
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "RadioGroup", FrameworkParentKind.RADIO);
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "LinearLayout", FrameworkParentKind.LINEAR);
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "Toolbar", FrameworkParentKind.TOOLBAR);
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "FrameLayout", FrameworkParentKind.FRAME);
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "RelativeLayout", FrameworkParentKind.RELATIVE);
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "GridLayout", FrameworkParentKind.GRID);
+    emitFrameworkRootBranch(node, variable, runtimeParentVariable,
+        "AbsoluteLayout", FrameworkParentKind.ABSOLUTE);
+    out.open("else");
+    if (hasParentSpecificRootAttributes(node)) {
+      out.line(
+          "throw new IllegalArgumentException(\"No X2C LayoutParams contract for parent \" + "
+              + runtimeParentVariable
+              + ".getClass().getName() + \"; declare custom parents in x2c.customViewsFile\");");
+    } else {
+      emitGenericRootLayoutParams(node, variable);
+    }
+    out.close();
+  }
+
+  private void emitFrameworkRootBranch(
+      LayoutNode node,
+      String variable,
+      String runtimeParentVariable,
+      String parentType,
+      FrameworkParentKind kind) {
+    out.open("else if (" + runtimeParentVariable + " instanceof " + parentType + ")");
+    String params = emitFrameworkLayoutParams(node, kind, variable);
+    out.line(variable + ".setLayoutParams(" + params + ");");
+    out.close();
+  }
+
+  private void emitGenericRootLayoutParams(LayoutNode node, String variable) {
+    out.line(
+        variable
+            + ".setLayoutParams(new ViewGroup.LayoutParams("
+            + sizeExpression(node.attributes.get("layout_width"))
+            + ", "
+            + sizeExpression(node.attributes.get("layout_height"))
+            + "));");
+  }
+
+  private boolean hasParentSpecificRootAttributes(LayoutNode node) {
+    if (!node.rootLayoutAttributesByParentClass.isEmpty()) {
+      return true;
+    }
+    for (String attribute : node.attributes.keySet()) {
+      if (attribute.startsWith("layout_")
+          && !setOf("layout_width", "layout_height").contains(attribute)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private String emitLayoutParams(LayoutNode node, LayoutNode parent, String variable) {
+    if (FRAMEWORK_CONTAINERS.contains(parent.tag)) {
+      return emitFrameworkLayoutParams(node, frameworkParentKind(parent.tag), variable);
+    }
+    if (parent.customView == null || parent.container() == null) {
+      throw new AssertionError("Parent is not a ViewGroup: " + parent.tag);
+    }
+    return emitCustomLayoutParams(node, parent.customView, variable);
+  }
+
+  private String emitFrameworkLayoutParams(
+      LayoutNode node, FrameworkParentKind kind, String variable) {
     String params = variable + "Params";
     String width = sizeExpression(node.attributes.get("layout_width"));
     String height = sizeExpression(node.attributes.get("layout_height"));
-    if (FRAMEWORK_CONTAINERS.contains(parent.tag)) {
-      FrameworkParentKind kind = frameworkParentKind(parent.tag);
-      switch (kind) {
+    switch (kind) {
         case LINEAR:
           emitLinearLayoutParams("LinearLayout.LayoutParams", node, params, width, height);
           break;
@@ -170,13 +263,16 @@ final class LayoutEmitter {
           break;
         default:
           throw new AssertionError(kind);
-      }
-      return params;
     }
+    return params;
+  }
+
+  private String emitCustomLayoutParams(
+      LayoutNode node, CustomViewRegistry.ViewSpec parent, String variable) {
+    String params = variable + "Params";
+    String width = sizeExpression(node.attributes.get("layout_width"));
+    String height = sizeExpression(node.attributes.get("layout_height"));
     CustomViewRegistry.ContainerSpec container = parent.container();
-    if (container == null) {
-      throw new AssertionError("Parent is not a ViewGroup: " + parent.tag);
-    }
     if (container.layoutParamsFactoryClass() == null) {
       out.line(
           container.layoutParamsClass()
@@ -209,6 +305,13 @@ final class LayoutEmitter {
     }
     for (CustomAttributeValue attribute : node.layoutAttributes.values()) {
       emitCustomAssignment(params, attribute);
+    }
+    Map<String, CustomAttributeValue> rootAttributes =
+        node.rootLayoutAttributesByParentClass.get(parent.className());
+    if (rootAttributes != null) {
+      for (CustomAttributeValue attribute : rootAttributes.values()) {
+        emitCustomAssignment(params, attribute);
+      }
     }
     return params;
   }
@@ -268,9 +371,15 @@ final class LayoutEmitter {
             entry("layout_centerVertical", "CENTER_VERTICAL"),
             entry("layout_centerInParent", "CENTER_IN_PARENT"));
     for (Map.Entry<String, String> rule : booleanRules.entrySet()) {
-      if (node.attributes.containsKey(rule.getKey())
-          && literalBoolean(node.attributes.get(rule.getKey()))) {
-        out.line(params + ".addRule(RelativeLayout." + rule.getValue() + ");");
+      if (node.attributes.containsKey(rule.getKey())) {
+        String value = node.attributes.get(rule.getKey());
+        if (value.startsWith("@bool/")) {
+          out.open("if (" + booleanExpression(value) + ")");
+          out.line(params + ".addRule(RelativeLayout." + rule.getValue() + ");");
+          out.close();
+        } else if (Boolean.parseBoolean(value)) {
+          out.line(params + ".addRule(RelativeLayout." + rule.getValue() + ");");
+        }
       }
     }
     if (node.attributes.containsKey("layout_alignWithParentIfMissing")) {
@@ -590,6 +699,32 @@ final class LayoutEmitter {
               + integerFlagsExpression(attrs.get("imeOptions"), false)
               + ");");
     }
+    boolean hasAbsoluteDrawables = attrs.containsKey("drawableLeft")
+        || attrs.containsKey("drawableRight")
+        || attrs.containsKey("drawableTop")
+        || attrs.containsKey("drawableBottom");
+    if (hasAbsoluteDrawables) {
+      out.line(
+          variable + ".setCompoundDrawablesWithIntrinsicBounds("
+              + optionalCompoundDrawable(attrs.get("drawableLeft")) + ", "
+              + optionalCompoundDrawable(attrs.get("drawableTop")) + ", "
+              + optionalCompoundDrawable(attrs.get("drawableRight")) + ", "
+              + optionalCompoundDrawable(attrs.get("drawableBottom")) + ");");
+    }
+    boolean hasRelativeDrawables = attrs.containsKey("drawableStart")
+        || attrs.containsKey("drawableEnd");
+    if (hasRelativeDrawables) {
+      out.line(
+          variable + ".setCompoundDrawablesRelativeWithIntrinsicBounds("
+              + optionalCompoundDrawable(attrs.get("drawableStart")) + ", "
+              + optionalCompoundDrawable(attrs.get("drawableTop")) + ", "
+              + optionalCompoundDrawable(attrs.get("drawableEnd")) + ", "
+              + optionalCompoundDrawable(attrs.get("drawableBottom")) + ");");
+    }
+    if (attrs.containsKey("drawablePadding")) {
+      out.line(variable + ".setCompoundDrawablePadding("
+          + roundedDimension(attrs.get("drawablePadding")) + ");");
+    }
     if ((COMPOUND_BUTTON_TAGS.contains(node.tag) || node.tag.equals("CheckedTextView"))
         && attrs.containsKey("checked")) {
       out.line(variable + ".setChecked(" + booleanExpression(attrs.get("checked")) + ");");
@@ -690,8 +825,6 @@ final class LayoutEmitter {
     emitBooleanSetter(attrs, variable, "longClickable", "setLongClickable");
     emitBooleanSetter(attrs, variable, "focusable", "setFocusable");
     emitBooleanSetter(attrs, variable, "focusableInTouchMode", "setFocusableInTouchMode");
-    emitBooleanSetter(attrs, variable, "selected", "setSelected");
-    emitBooleanSetter(attrs, variable, "activated", "setActivated");
     emitBooleanSetter(attrs, variable, "saveEnabled", "setSaveEnabled");
     emitBooleanSetter(attrs, variable, "keepScreenOn", "setKeepScreenOn");
     emitBooleanSetter(attrs, variable, "fitsSystemWindows", "setFitsSystemWindows");
@@ -1020,13 +1153,6 @@ final class LayoutEmitter {
     return floatLiteral(floatValue(value));
   }
 
-  private boolean literalBoolean(String value) {
-    if (value.startsWith("@bool/")) {
-      return model.bools.get(referenceName(value, "bool"));
-    }
-    return Boolean.parseBoolean(value);
-  }
-
   private String textStyleExpression(String value) {
     if (value.equals("normal")) {
       return "Typeface.NORMAL";
@@ -1137,6 +1263,17 @@ final class LayoutEmitter {
     return pluginMode
         ? "X2cModule.provider().getDrawable(context, " + javaString(name) + ")"
         : "X2cDrawables." + javaName(name) + "(context)";
+  }
+
+  private String optionalCompoundDrawable(String value) {
+    if (value == null) return "null";
+    String name = referenceName(value, "drawable");
+    if (!pluginMode && model.bitmaps.containsKey(name)) {
+      return "context.getResources().getDrawable(X2cModule.identifier(\"drawable\", "
+          + javaString(name)
+          + "), context.getTheme())";
+    }
+    return drawableExpression(name);
   }
 
   private String idExpression(String value) {

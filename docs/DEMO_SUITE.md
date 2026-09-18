@@ -4,15 +4,18 @@
 
 仅切换第三个 Demo 的 XML2Java：构建时追加 `-Px2c.normal.enable=true`；省略或设为 false 使用系统资源。两个动态插件的生成模式不受该参数影响。
 
-API 工作台区分两种 inflate 契约：系统路径 detached 时提供父容器专属 LayoutParams，attach=true 返回父容器；生成路径 detached 时保留 factory 的通用根 LayoutParams，attach=true 返回新布局，父容器在 addView 时转换参数。当前不保证这两种返回值/根参数完全一致，测试按实际公开行为展示，不将其当作无差别的 Android inflater 替代品。
+API 工作台区分两种 inflate 契约：系统路径和生成路径都会根据显式父容器创建对应 LayoutParams，保留根
+margin/gravity 等属性；系统 `attach=true` 返回父容器，生成路径返回实际新增的 child。测试按公开差异断言，
+不把返回值伪装成完全相同。普通 Activity 还会解析一个独立的 Manifest theme 属性，证明 normal 模式不读取
+源码中可能保留的插件 `themeKey`。
 
 首页三个入口：
 
 | Demo | 内容 | 运行方式 |
 | --- | --- | --- |
-| 全能力实验室 | 53 个 framework 控件 XML；组合布局、通用属性、自定义构造/setter/LayoutParams；values/drawable、图片、宿主回退；四大组件 | Layout DEX + Component DEX，公共 runtime 由宿主提供 |
-| 哔哩哔哩风格首页 | 推荐/分区/搜索/刷新/加载更多、视频详情、本地播放、点赞/投币/收藏/关注/评论、历史/草稿、会员套餐选择演示 | Component DEX 内独立 Activity，首页与卡片均由 XML2Java 构建 |
-| X2C API 工作台 | 普通 AAR 真实 ID、字符串布局、资源 API、本地图片、inflate attach/detach、原生 merge、缺失资源/类型不匹配、点击状态恢复 | normal-library 静态集成，默认无生成代码 |
+| 全能力实验室 | 53 个 framework 控件 XML；组合布局、通用属性、自定义构造/setter/LayoutParams；values/drawable、图片、宿主回退；四大组件 | Layout DEX + Component DEX，Activity 通过 `themeKey` 使用宿主预埋主题 |
+| 哔哩哔哩风格首页 | 推荐/分区/搜索/刷新/加载更多、视频详情、本地播放、点赞/投币/收藏/关注/评论、历史/草稿、会员套餐选择演示 | Component DEX 内独立 Activity，XML2Java UI 使用独立宿主主题 key |
+| X2C API 工作台 | 普通 AAR 真实 ID、Manifest Activity theme、字符串布局、资源 API、本地图片、inflate attach/detach、原生 merge、异常边界 | normal-library 静态集成，默认系统资源且不消费 `themeKey` |
 
 这是三个用户场景，不要求三个物理 JAR。两个签名 DEX JAR 由独立 PluginClassLoader 加载：能力实验室可跳转到另一 JAR 的四大组件测试，视频首页也在第二个 JAR 内；普通 API 工作台没有动态加载依赖。
 
@@ -22,7 +25,7 @@ API 工作台区分两种 inflate 契约：系统路径 detached 时提供父容
 
 通用属性页包含背景/前景/tint、状态、焦点、变换、最小尺寸、布局方向和无障碍属性。`framework_matrix.xml` 验证组合关系；`custom_views.xml` 现在提供可见 onDraw 效果，并独立断言 `CONTEXT`、`CONTEXT_ATTRS`、`CONTEXT_ATTRS_DEF_STYLE` 构造、八种 typed setter、三子项自定义 LayoutParams 和 childrenReady 回调。`android:textColorHint` 与 `android:scrollbars` 由 XML 编译器校验并直接生成 setter，不再由 Demo 补写。注册表覆盖不等于每个控件的所有 Android 属性都受支持，也不等于已穷举所有属性组合；未知属性和不支持的资源仍由编译器严格拒绝。
 
-Values 覆盖当前 11 类资源命名空间；Drawable 覆盖 rectangle/oval/line/ring、状态选择器、layer/inset/clip/scale/rotate/level-list 和 color selector。ring 显式内半径/厚度要求 minApi≥29，当前 minApi21 的示例使用默认尺寸。插件 XML 不支持的 include/merge、vector、styleable 等不伪造成功；普通系统资源路径的 merge 在 API 工作台单独验证。
+Values 覆盖当前 11 类资源命名空间；Drawable 覆盖 rectangle/oval/line/ring、状态选择器、layer/inset/clip/scale/rotate/level-list 和 color selector。ring 显式内半径/厚度要求 minApi≥29，当前 minApi21 的示例使用默认尺寸。本地 include 使用受测的编译期展开规则；merge、vector、styleable 等不伪造成功，普通系统资源路径的 merge 在 API 工作台单独验证。
 
 图片页使用此前提供的 3 张插件本地 JPG→CDN 元数据及 2 张宿主 JPG。记录 LOADING/PASS/FAIL，支持重载/取消；离线失败不会标记为 PASS。宿主同名资源不能覆盖插件声明；宿主独有 value/drawable 允许回退；id/layout 不越界回退。
 
@@ -39,7 +42,7 @@ Values 覆盖当前 11 类资源命名空间；Drawable 覆盖 rectangle/oval/li
 ## 验证与清理
 
 - `bash scripts/verify.sh`：编译器/runtime 基础回归与 APK/DEX/资源完整性检查。
-- `bash scripts/verify-demo-suite.sh`：构建 APK，并检查 53 个 XML 与注册表一致、两个资源为空的 DEX 载荷、新 Activity/四大组件入口、普通模块无生成代码、宿主视频存在。
+- `bash scripts/verify-demo-suite.sh`：构建 APK，并检查 53 个 XML 与注册表一致、两个资源为空的 DEX 载荷、组件 ABI/theme metadata、新 Activity/四大组件入口、普通模块无生成代码、宿主视频存在。
 - `ADB=/path/to/adb ANDROID_SERIAL=device bash scripts/verify-plugin-showcases.sh`：设备交互冒烟。只覆盖关键路径，不代表对全部交互的穷举验证。
 
 已移除旧登录流程、JVM 功能演示类、旧 ClassJarSmoke、normal-app 独立工程与旧双入口启动页；保留基础库自动化测试，以及新能力页仍需要的 XML/自定义 View/四大组件基础实现。源码删除可通过版本控制恢复。新的唯一 APK 不会依赖历史安装的另一个应用。

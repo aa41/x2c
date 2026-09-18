@@ -211,6 +211,10 @@ public abstract class PluginActivity extends Activity {
         return requireContainer().getTitleColor();
     }
 
+    @Override public void setFinishOnTouchOutside(boolean finish) {
+        requireContainer().setFinishOnTouchOutside(finish);
+    }
+
     @Override public void finish() {
         requireContainer().finish();
     }

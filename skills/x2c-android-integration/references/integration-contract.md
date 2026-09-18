@@ -47,25 +47,50 @@ Important distinctions:
 - `generatedPackage`: private generated Java namespace. It must differ across simultaneously loaded
   plugins.
 - `minApi`: code-generation API gate, not a replacement for Android `defaultConfig.minSdk`.
+- `report.json.inferredHostResources`: exact host string/color/bool/integer/dimen/drawable names
+  inferred from unresolved plugin layout references. Module initialization validates the complete
+  set before publishing generated layouts. Normal mode never infers host dependencies.
 
 Use a strict Gradle property provider for CLI/CI switching. An explicit `pluginMode.set(...)` value
 overrides the plugin convention, so do not promise command-line switching while hardcoding another
 value in the module.
 
+Mode switching does not make plugin component APIs available to normal source automatically. Keep
+business/UI logic in a mode-neutral module or `src/main`, and bind a small navigation/component
+adapter from mutually exclusive plugin and normal source sets. Direct `PluginActivityManager` (or
+other component-manager) imports belong only to the plugin adapter.
+
 ## Business API
 
-Initialize once in the real host `Application`:
+Initialize once in the real host `Application`. Plugin hosts must also publish their immutable
+Activity theme contract:
 
 ```java
 @Override public void onCreate() {
     super.onCreate();
-    X2C.init(this);
+    X2C.init(
+            this,
+            PluginHostConfig.builder()
+                    .defaultActivityTheme(R.style.HostPluginDefault)
+                    .activityTheme("commerce.detail.light.v1", R.style.HostPluginCommerceDetail)
+                    .build());
 }
 ```
 
 If a hardening SDK installs a stable host ClassLoader later, use the explicit overload only after
-that transition is complete. Initialization must precede plugin loader creation and all resource
-access.
+that transition is complete. Normal AAR-only hosts use `X2C.init(...)` instead. Initialization must
+precede plugin loader creation and all resource access.
+
+Activity theme ownership is deliberately different by mode:
+
+| Mode | Theme source | Ignored source |
+|---|---|---|
+| normal AAR | merged Manifest Activity `android:theme`; otherwise application theme | `@X2cPluginActivity.themeKey` |
+| dynamic plugin | annotation `themeKey` resolved through host `PluginHostConfig` | plugin Manifest Activity/theme declarations |
+
+This remains true when one host APK contains both kinds of feature. Such an Application may need
+the `PluginHostConfig` overload for its dynamic plugins, but native normal Activities still receive
+their themes exclusively from Android's merged Manifest.
 
 Business code identifies its module by an anchor class and layout/resource name:
 

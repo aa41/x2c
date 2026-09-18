@@ -9,9 +9,14 @@ import android.os.Bundle;
 import dev.x2c.plugin.api.PluginActivityInfo;
 import dev.x2c.plugin.api.PluginActivityRegistry;
 import dev.x2c.plugin.api.PluginLaunchMode;
+import dev.x2c.runtime.PluginThemeRegistry;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Host-owned registry, container allocator, and Activity launch entry point. */
 public final class PluginActivityManager {
@@ -28,9 +33,12 @@ public final class PluginActivityManager {
     private PluginActivityManager() {}
 
     static void installActivities(
-            ClassLoader pluginClassLoader, PluginActivityRegistry registry) {
+            ClassLoader pluginClassLoader,
+            PluginActivityRegistry registry,
+            PluginActivityInfo[] activities) {
         Objects.requireNonNull(pluginClassLoader, "pluginClassLoader");
         Objects.requireNonNull(registry, "registry");
+        Objects.requireNonNull(activities, "activities");
         String pluginId = requireText(registry.pluginId(), "pluginId");
         if (registry.getClass().getClassLoader() != pluginClassLoader) {
             throw new IllegalArgumentException("Registry was not loaded by the supplied plugin ClassLoader");
@@ -41,8 +49,57 @@ public final class PluginActivityManager {
                 if (previous.classLoader == pluginClassLoader && previous.registry == registry) return;
                 throw new IllegalStateException("Plugin ID is already installed: " + pluginId);
             }
-            PLUGINS.put(pluginId, new InstalledPlugin(pluginClassLoader, registry));
+            PLUGINS.put(pluginId, new InstalledPlugin(
+                    pluginClassLoader, registry, activities));
         }
+    }
+
+    static PluginActivityInfo[] validateActivities(PluginActivityRegistry registry) {
+        Objects.requireNonNull(registry, "registry");
+        PluginActivityInfo[] activities = Objects.requireNonNull(
+                registry.activities(), "Plugin Activity registry returned null activities");
+        if (activities.length > 32) {
+            throw new IllegalStateException(
+                    "Plugin declares more than 32 Activities, exceeding the host container pool");
+        }
+        Set<String> names = new HashSet<String>();
+        int[] launchModeCounts = new int[PluginLaunchMode.values().length];
+        for (PluginActivityInfo activity : activities) {
+            if (activity == null) {
+                throw new IllegalStateException("Plugin Activity registry contains null metadata");
+            }
+            String className = requireText(activity.className, "Activity className");
+            Objects.requireNonNull(activity.launchMode, "Activity launchMode");
+            int launchModeCount = ++launchModeCounts[activity.launchMode.ordinal()];
+            if (launchModeCount > SLOTS_PER_LAUNCH_MODE) {
+                throw new IllegalStateException(
+                        "Plugin declares more than " + SLOTS_PER_LAUNCH_MODE + ' '
+                                + activity.launchMode
+                                + " Activities, exceeding the host container pool");
+            }
+            if (!activity.themeKey.isEmpty()) {
+                PluginThemeRegistry.validateThemeKey(activity.themeKey);
+            }
+            if (!names.add(className)) {
+                throw new IllegalStateException(
+                        "Plugin Activity registry contains duplicate metadata: " + className);
+            }
+            if (!registry.contains(className)) {
+                throw new IllegalStateException(
+                        "Plugin Activity registry does not contain enumerated Activity: "
+                                + className);
+            }
+            PluginActivityInfo lookup = Objects.requireNonNull(
+                    registry.info(className), "Plugin Activity registry returned null info");
+            if (!className.equals(lookup.className)
+                    || activity.launchMode != lookup.launchMode
+                    || !activity.themeKey.equals(lookup.themeKey)) {
+                throw new IllegalStateException(
+                        "Plugin Activity registry returned inconsistent metadata for "
+                                + className);
+            }
+        }
+        return activities.clone();
     }
 
     static void uninstallActivities(String pluginId) {
@@ -116,10 +173,7 @@ public final class PluginActivityManager {
         String target = requireExtra(containerIntent, EXTRA_TARGET_ACTIVITY);
         Intent pluginIntent = requirePluginIntent(containerIntent);
         InstalledPlugin installed = requirePlugin(pluginId);
-        PluginActivityInfo info = installed.registry.info(target);
-        if (!target.equals(info.className)) {
-            throw new IllegalStateException("Registry returned mismatched Activity metadata for " + target);
-        }
+        installed.requireInfo(target);
         Activity raw = installed.registry.create(target);
         if (!(raw instanceof PluginActivity)) {
             throw new IllegalStateException(
@@ -128,6 +182,13 @@ public final class PluginActivityManager {
         PluginActivity activity = (PluginActivity) raw;
         activity.attachPlugin(container, pluginId, target, pluginIntent);
         return activity;
+    }
+
+    static int resolveActivityTheme(Intent containerIntent) {
+        String pluginId = requireExtra(containerIntent, EXTRA_PLUGIN_ID);
+        String target = requireExtra(containerIntent, EXTRA_TARGET_ACTIVITY);
+        PluginActivityInfo info = requirePlugin(pluginId).requireInfo(target);
+        return PluginThemeRegistry.resolveActivityTheme(info.themeKey, info.className);
     }
 
     static Intent requirePluginIntent(Intent containerIntent) {
@@ -140,10 +201,8 @@ public final class PluginActivityManager {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(pluginIntent, "pluginIntent");
         InstalledPlugin installed = requirePlugin(requireText(pluginId, "pluginId"));
-        PluginActivityInfo info = installed.registry.info(requireText(target, "activityClassName"));
-        if (!target.equals(info.className)) {
-            throw new IllegalArgumentException("Unknown plugin Activity: " + target);
-        }
+        PluginActivityInfo info = installed.requireInfo(
+                requireText(target, "activityClassName"));
         Class<? extends PluginContainerActivity> container = allocateContainer(
                 pluginId, target, info.launchMode);
         Intent result = new Intent(context, container);
@@ -170,7 +229,7 @@ public final class PluginActivityManager {
         if (component == null) return null;
         String target = component.getClassName();
         InstalledPlugin installed = requirePlugin(pluginId);
-        return installed.registry.contains(target) ? target : null;
+        return installed.activities.containsKey(target) ? target : null;
     }
 
     private static InstalledPlugin requirePlugin(String pluginId) {
@@ -202,10 +261,29 @@ public final class PluginActivityManager {
     private static final class InstalledPlugin {
         final ClassLoader classLoader;
         final PluginActivityRegistry registry;
+        final Map<String, PluginActivityInfo> activities;
 
-        InstalledPlugin(ClassLoader classLoader, PluginActivityRegistry registry) {
+        InstalledPlugin(
+                ClassLoader classLoader,
+                PluginActivityRegistry registry,
+                PluginActivityInfo[] activityInfos) {
             this.classLoader = classLoader;
             this.registry = registry;
+            Map<String, PluginActivityInfo> byName =
+                    new LinkedHashMap<String, PluginActivityInfo>();
+            for (PluginActivityInfo activity : activityInfos) {
+                byName.put(activity.className, activity);
+            }
+            this.activities = Collections.unmodifiableMap(byName);
+        }
+
+        PluginActivityInfo requireInfo(String className) {
+            PluginActivityInfo info = activities.get(className);
+            if (info == null) {
+                throw new IllegalArgumentException(
+                        "Unknown plugin Activity: " + className);
+            }
+            return info;
         }
     }
 }

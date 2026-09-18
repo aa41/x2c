@@ -10,4 +10,10 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface X2cPluginActivity {
     PluginLaunchMode launchMode() default PluginLaunchMode.STANDARD;
+
+    /**
+     * Stable host theme contract key. An empty value requests the host's default plugin Activity
+     * theme; the plugin never embeds or persists a host resource ID.
+     */
+    String themeKey() default "";
 }

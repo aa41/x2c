@@ -1,4 +1,4 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#F4F6FA">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/lab_root" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_gravity="center" android:layout_margin="4dp" android:orientation="vertical" android:background="#F4F6FA">
 <TextView android:id="@+id/lab_back" android:layout_width="match_parent" android:layout_height="56dp" android:padding="16dp" android:text="‹  全能力实验室" android:textSize="20sp" android:textStyle="bold" android:textColor="#17223B"/>
 <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true"><LinearLayout android:id="@+id/lab_body" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp"/></ScrollView>
 </LinearLayout>

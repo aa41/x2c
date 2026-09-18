@@ -11,7 +11,8 @@ final class X2cModuleSourceGenerator {
         JavaSource out = new JavaSource(packageName, "X2cModule");
         out.line("import android.content.Context;");
         out.line("import android.view.View;");
-        out.line("import dev.x2c.runtime.LayoutFactory;");
+        out.line("import android.view.ViewGroup;");
+        out.line("import dev.x2c.runtime.ParentAwareLayoutFactory;");
         out.line("import dev.x2c.runtime.X2C;");
         if (pluginMode) {
             out.line("import dev.x2c.runtime.X2cResourceProvider;");
@@ -37,6 +38,13 @@ final class X2cModuleSourceGenerator {
         if (pluginMode) {
             out.line("X2cResourceProvider created = X2C.createPluginResourceProvider("
                     + "context, new X2cResourceProviderImpl());");
+            for (java.util.Map.Entry<String, java.util.List<String>> entry
+                    : model.hostResources.entries().entrySet()) {
+                for (String name : entry.getValue()) {
+                    out.line("created.getIdentifier(\"" + entry.getKey() + "\", \""
+                            + name + "\");");
+                }
+            }
             // Publish before registration so generated drawable/value dependency lookups are safe
             // as soon as the provider becomes visible through the host registry.
             out.line("provider = created;");
@@ -53,10 +61,15 @@ final class X2cModuleSourceGenerator {
                     ? "R2.layout." + javaName
                     : "created.getIdentifier(\"layout\", \"" + layoutName + "\")";
             out.open("X2C.registerLayout(NAME, \"" + layoutName + "\", " + layoutId
-                    + ", new LayoutFactory()");
+                    + ", new ParentAwareLayoutFactory()");
             out.line("@Override public View create(Context factoryContext) {");
             out.indent();
             out.line("return X2cLayouts." + javaName + "(factoryContext);");
+            out.unindent();
+            out.line("}");
+            out.line("@Override public View create(Context factoryContext, ViewGroup parent) {");
+            out.indent();
+            out.line("return X2cLayouts." + javaName + "(factoryContext, parent);");
             out.unindent();
             out.line("}");
             out.closeWith(");");

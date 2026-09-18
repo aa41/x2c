@@ -66,7 +66,8 @@ Activity 父类链与结构性 nest/内部类，并统一改写为 `BusinessBase
 这里不会再把 BaseActivity 的所有字段类型、生命周期埋点、controller 或 SDK 自动复制进插件。必须同
 ClassLoader 的插件私有实现通过 `@X2cPluginBase(include = {...})` 明确声明；analytics、账户、网络、路由等
 未进入 payload 的能力由 PluginClassLoader 在插件查找失败后直接委托宿主。无需业务注解或白名单；宿主需
-保证相关 class/member 存在，并为后发插件调用配置 shrink keep 与版本兼容策略。
+保证相关 class/member 存在，并为后发插件调用配置 shrink keep 与版本兼容策略。SDK 自身的
+runtime/API/base 包由 `x2c-plugin-runtime` consumer rules 保留，但该规则不会替业务包自动扩张 keep 范围。
 
 第一阶段 ownership 规则是：平台与 X2C runtime/API/base/loader 为 parent-first 且禁止打包；business
 base transform unit 和显式 include 为 plugin-private；其余未打包业务引用采用 host fallback。相关

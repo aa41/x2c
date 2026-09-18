@@ -63,6 +63,13 @@ android {
 
     sourceSets {
         getByName("main") {
+            java.srcDir(
+                if (isX2cPluginBuild) {
+                    "src/plugin/java"
+                } else {
+                    "src/normal/java"
+                },
+            )
             manifest.srcFile(
                 if (isX2cPluginBuild) {
                     "src/main/AndroidManifest.xml"

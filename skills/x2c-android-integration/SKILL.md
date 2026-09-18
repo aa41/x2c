@@ -51,7 +51,9 @@ project. It defines the modules, artifacts, DSL, ownership, and runtime API shar
    path, and unsupported inputs that will fail the build.
 5. Make the smallest coherent integration. Keep producer, host, and optional shared business-base
    responsibilities separate. Business code uses `X2C`/`X2cResources`; it must not import generated
-   `R2`, `X2cModule`, `X2cLayouts`, or provider implementation classes.
+   `R2`, `X2cModule`, `X2cLayouts`, or provider implementation classes. In a dual-mode feature,
+   common source must also not import `dev.x2c.plugin.runtime`: put plugin routing and normal Android
+   navigation/component creation behind separate source-set adapters.
 6. Build through `x2cBuild<Variant>` with an explicit mode. Do not treat Gradle exit code alone as
    proof. Run the post-check against the actual artifact and reports:
 
@@ -63,8 +65,9 @@ project. It defines the modules, artifacts, DSL, ownership, and runtime API shar
 
 7. If a host exists, build the host and perform focused runtime checks. Plugin mode must cover
    signature rejection, cold-process install, class ownership, module registration, component
-   routing, host fallback resources, and process-restart upgrade behavior. Normal mode must cover
-   Manifest/resource merge, configuration/theme behavior, and native component creation.
+   routing, host fallback resources, `themeKey` resolution, and process-restart upgrade behavior.
+   Normal mode must cover Manifest/resource merge, Activity-level theme precedence,
+   configuration behavior, and native component creation.
 8. Re-run preflight after changes. Summarize what changed, commands and observable results,
    remaining warnings, production gates, and exact rollback files. Do not commit, publish, upload
    images, install APKs, or modify a remote service unless the user requested that action.
@@ -83,13 +86,26 @@ project. It defines the modules, artifacts, DSL, ownership, and runtime API shar
 - The host owns exactly one copy of `x2c-runtime`, `x2c-plugin-api`, `x2c-plugin-base`,
   `x2c-plugin-loader`, and `x2c-plugin-runtime`. Plugin producers compile against relevant runtime
   modules with `compileOnly`.
-- The real host `Application` calls `X2C.init(...)` once after any hardening/proxy loader is stable
-  and before plugin ClassLoader creation or X2C access. Generated modules, components, and resource
-  calls must not repeat initialization.
+- The real plugin host `Application` calls `X2C.init(..., PluginHostConfig)` once
+  after any hardening/proxy loader is stable and before plugin ClassLoader creation or X2C access.
+  The immutable host theme table maps plugin `themeKey` values to real host styles. Normal AAR-only
+  hosts call `X2C.init(...)`. Generated modules, components, and resource calls must not repeat
+  initialization.
+- Activity theme sources are mode-exclusive. Normal components use only the merged Android
+  Manifest (`activity android:theme`, then application theme) and ignore
+  `@X2cPluginActivity.themeKey`. Plugin Activities use only `themeKey` plus the immutable host
+  theme table; a plugin Manifest component/theme declaration is invalid and must never be used as
+  fallback.
 - Plugin bitmap upload is an external CI step. The build only consumes an immutable HTTPS/SHA-256
   asset lock. Never read upload credentials or perform network uploads as part of Gradle codegen.
 - Synthetic `R2.id` values are View IDs, not `resources.arsc` entries. They support View identity,
   keyed tags, and layout relations, but must not be passed to host `Resources` value APIs.
+- In plugin mode, unresolved layout references to string/color/bool/integer/dimen/drawable are
+  inferred as host dependencies. Review `inferredHostResources` in `report.json`; generated module
+  initialization must preflight every inferred name before publishing provider/layout state.
+- `pluginMode` selects a build/runtime model, not a magic compatibility layer for arbitrary source
+  dependencies. Shared feature code may use the X2C facade, while plugin component managers and
+  native Manifest/Intent wiring remain mode-specific.
 - Unsupported resources, unsafe bytecode, missing host dependencies, duplicate identities,
   capacity overflow, signature mismatch, downgrade, or same-version content replacement must
   remain explicit failures. Do not add reflection/XML fallback to hide them.

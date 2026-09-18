@@ -3,6 +3,7 @@
         <!-- Merged into the consuming app; the app does not redeclare this Activity. -->
         <activity
             android:name=".NormalDemoActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:theme="@style/X2cNormalManifestTheme" />
     </application>
 </manifest>
