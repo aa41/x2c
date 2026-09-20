@@ -50,6 +50,9 @@ val compileRuntimeCoreTest by tasks.registering(JavaCompile::class) {
             "../x2c-plugin-api/src/main/java/dev/x2c/plugin/api/PluginLaunchMode.java",
         ),
         layout.projectDirectory.file(
+            "../x2c-plugin-api/src/main/java/dev/x2c/plugin/api/PluginWindowProfile.java",
+        ),
+        layout.projectDirectory.file(
             "src/main/java/dev/x2c/plugin/runtime/PluginSlotAllocator.java",
         ),
         layout.projectDirectory.file(

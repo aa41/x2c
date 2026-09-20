@@ -39,8 +39,9 @@
 | Java 8 匿名/局部类闭包 | `BaseActivity.class` 被复制但 `$1/$2` 遗漏，运行时报 `IllegalAccessError` | 读取 `EnclosingMethod` owner，将 owner 已入选的匿名/局部类纳入结构闭包 | 匿名类 JAR 回归测试和真机 |
 | Activity API 容器桥接 | delegate 执行 `setFinishOnTouchOutside` 访问未初始化 `mWindow` | 非 final 方法正常 override；真正 final API 使用 receiver-aware 静态桥 | ASM 虚分派/静态桥断言 |
 
-Activity bridge 曾将宿主/插件二进制协议由 2 提升为 3；宿主主题 metadata 契约又将当前协议提升为 4。
-宿主必须拒绝所有非 ABI 4 payload。`x2c-plugin-runtime` 同时携带 consumer rules，保留后发 DEX 动态调用的 X2C SDK ABI。
+Activity bridge 曾将宿主/插件二进制协议由 2 提升为 3；宿主主题 metadata 契约将协议提升为 4；
+Opaque/Translucent 双 Window Profile 容器与 metadata 将当前协议提升为 5。宿主必须拒绝所有非 ABI 5
+payload。`x2c-plugin-runtime` 同时携带 consumer rules，保留后发 DEX 动态调用的 X2C SDK ABI。
 
 ## 4. 详细设计
 

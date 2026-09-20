@@ -37,6 +37,42 @@
         <activity android:name=".PluginContainerActivities$SingleInstance6" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Opaque" />
         <activity android:name=".PluginContainerActivities$SingleInstance7" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Opaque" />
 
+        <activity android:name=".PluginContainerActivities$TranslucentStandard0" android:exported="false" android:launchMode="standard" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentStandard1" android:exported="false" android:launchMode="standard" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentStandard2" android:exported="false" android:launchMode="standard" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentStandard3" android:exported="false" android:launchMode="standard" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentStandard4" android:exported="false" android:launchMode="standard" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentStandard5" android:exported="false" android:launchMode="standard" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentStandard6" android:exported="false" android:launchMode="standard" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentStandard7" android:exported="false" android:launchMode="standard" android:theme="@style/X2cPluginContainer.Translucent" />
+
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTop0" android:exported="false" android:launchMode="singleTop" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTop1" android:exported="false" android:launchMode="singleTop" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTop2" android:exported="false" android:launchMode="singleTop" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTop3" android:exported="false" android:launchMode="singleTop" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTop4" android:exported="false" android:launchMode="singleTop" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTop5" android:exported="false" android:launchMode="singleTop" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTop6" android:exported="false" android:launchMode="singleTop" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTop7" android:exported="false" android:launchMode="singleTop" android:theme="@style/X2cPluginContainer.Translucent" />
+
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTask0" android:exported="false" android:launchMode="singleTask" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTask1" android:exported="false" android:launchMode="singleTask" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTask2" android:exported="false" android:launchMode="singleTask" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTask3" android:exported="false" android:launchMode="singleTask" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTask4" android:exported="false" android:launchMode="singleTask" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTask5" android:exported="false" android:launchMode="singleTask" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTask6" android:exported="false" android:launchMode="singleTask" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleTask7" android:exported="false" android:launchMode="singleTask" android:theme="@style/X2cPluginContainer.Translucent" />
+
+        <activity android:name=".PluginContainerActivities$TranslucentSingleInstance0" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleInstance1" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleInstance2" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleInstance3" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleInstance4" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleInstance5" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleInstance6" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Translucent" />
+        <activity android:name=".PluginContainerActivities$TranslucentSingleInstance7" android:exported="false" android:launchMode="singleInstance" android:theme="@style/X2cPluginContainer.Translucent" />
+
         <service android:name=".PluginContainerServices$Slot0" android:exported="false" />
         <service android:name=".PluginContainerServices$Slot1" android:exported="false" />
         <service android:name=".PluginContainerServices$Slot2" android:exported="false" />

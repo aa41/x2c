@@ -110,15 +110,15 @@ framework 静态 children 容器覆盖 `LinearLayout`、`FrameLayout`、`Relativ
 ```kotlin
 plugins {
     id("com.android.library") version "8.11.1"
-    id("dev.x2c.codegen") version "0.2.0-SNAPSHOT"
-    id("dev.x2c.activity-plugin") version "0.2.0-SNAPSHOT"
+    id("dev.x2c.codegen") version "0.3.0-SNAPSHOT"
+    id("dev.x2c.activity-plugin") version "0.3.0-SNAPSHOT"
 }
 
 dependencies {
     // 动态 plugin library 不把 runtime 打入 payload；宿主使用 implementation。
-    compileOnly("dev.x2c:x2c-runtime:0.2.0-SNAPSHOT")
-    compileOnly("dev.x2c:x2c-plugin-runtime:0.2.0-SNAPSHOT")
-    compileOnly("dev.x2c:x2c-plugin-base:0.2.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-runtime:0.3.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-plugin-runtime:0.3.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-plugin-base:0.3.0-SNAPSHOT")
     // 可选：较大业务 project 无需拆 module；只复制被入口继承的最小 base 转换单元。
     compileOnly(project(":business-base"))
 }
@@ -144,7 +144,7 @@ x2c {
 
 ```kotlin
 dependencies {
-    compileOnly("dev.x2c:x2c-plugin-api:0.2.0-SNAPSHOT")
+    compileOnly("dev.x2c:x2c-plugin-api:0.3.0-SNAPSHOT")
 }
 ```
 
@@ -152,10 +152,10 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("dev.x2c:x2c-runtime:0.2.0-SNAPSHOT")
-    implementation("dev.x2c:x2c-plugin-loader:0.2.0-SNAPSHOT")
-    implementation("dev.x2c:x2c-plugin-runtime:0.2.0-SNAPSHOT")
-    implementation("dev.x2c:x2c-plugin-base:0.2.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-runtime:0.3.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-plugin-loader:0.3.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-plugin-runtime:0.3.0-SNAPSHOT")
+    implementation("dev.x2c:x2c-plugin-base:0.3.0-SNAPSHOT")
 }
 ```
 
@@ -167,19 +167,22 @@ X2C.init(
         PluginHostConfig.builder()
                 .defaultActivityTheme(R.style.HostPluginDefault)
                 .activityTheme("commerce.detail.light.v1", R.style.HostPluginCommerceDetail)
+                .activityTheme("commerce.dialog.v1", R.style.HostNativeTranslucentDialog)
                 .activityTheme("video.home.dark.v1", "HostPluginVideoDark")
                 .build());
 ```
 
-插件 Activity 只声明稳定 key，例如
-`@X2cPluginActivity(themeKey = "commerce.detail.light.v1")`，不携带宿主资源 ID。直接传
+插件 Activity 只声明稳定 key 与固定窗口结构，例如
+`@X2cPluginActivity(themeKey = "commerce.dialog.v1", windowProfile = PluginWindowProfile.TRANSLUCENT)`，
+不携带宿主资源 ID；未声明 `windowProfile` 时默认 `OPAQUE`。直接传
 `R.style` 是发布构建的首选；字符串重载只接受宿主本地 style entry，并在首次初始化时通过
 `getIdentifier(name, "style", hostPackage)` 解析一次。只被名称访问的 style 必须有宿主静态引用或
-`tools:keep`，避免 resource shrinker 删除。缺失 key、非 style 资源以及与固定容器不兼容的
-translucent/floating/NoDisplay/ActionBar 主题都会在插件安装或宿主初始化阶段明确失败。插件 Manifest
-仍不得声明 Activity theme。宿主主题应继承 `@style/X2cPluginContainer.Opaque`，并确保所有
-night/locale 等 qualifier 变体保持相同窗口结构；runtime 在每次实际应用主题前会按当前 Configuration
-重新校验结构，但不会重新执行名称查询。
+`tools:keep`，避免 resource shrinker 删除。宿主原生 Style 可以直接注册，不要求改写 parent；runtime
+会把它分类为 `OPAQUE` 或 `TRANSLUCENT`，并在插件安装时与注解声明匹配。缺失 key、非 style、Profile
+不匹配以及 floating/NoDisplay/ActionBar 结构都会明确失败。也可分别继承
+`@style/X2cPluginContainer.Opaque` 或 `@style/X2cPluginContainer.Translucent`。所有 qualifier 变体必须
+保持相同窗口结构；runtime 在每次实际应用主题前会按当前 Configuration 重新校验，插件运行期
+`setTheme()` 也只能切换到相同 Profile 的已注册 Style。插件 Manifest 仍不得声明 Activity theme。
 
 普通 AAR 模式不读取 `themeKey`：Activity 由 Android framework 原生创建，优先使用合并后 Manifest
 中 Activity 自身的 `android:theme`，未声明时才继承 application theme。因而同一份 Activity 源码可以

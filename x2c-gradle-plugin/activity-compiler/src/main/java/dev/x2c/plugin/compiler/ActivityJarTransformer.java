@@ -26,7 +26,7 @@ import org.objectweb.asm.Opcodes;
 /** Converts annotated Android components and emits one direct-constructor component factory. */
 public final class ActivityJarTransformer {
     /** Host/plugin bytecode protocol emitted by this compiler. */
-    public static final int CURRENT_RUNTIME_ABI = 4;
+    public static final int CURRENT_RUNTIME_ABI = 5;
 
     public static final String REGISTRY_CLASS_NAME =
             "dev.x2c.generated.plugin.ComponentRegistry";
@@ -107,7 +107,7 @@ public final class ActivityJarTransformer {
                 case ACTIVITY:
                     validateThemeKey(model);
                     activities.add(new TransformedActivity(
-                            model.name, model.launchMode, model.themeKey));
+                            model.name, model.launchMode, model.themeKey, model.windowProfile));
                     break;
                 case SERVICE:
                     services.add(new TransformedComponent(model.name, null));
@@ -190,6 +190,7 @@ public final class ActivityJarTransformer {
 
                     @Override public void visitEnum(String name, String descriptor, String value) {
                         if ("launchMode".equals(name)) model.launchMode = value;
+                        if ("windowProfile".equals(name)) model.windowProfile = value;
                     }
                 };
             }
@@ -317,14 +318,16 @@ public final class ActivityJarTransformer {
     private static void validateContainerCapacity(List<TransformedActivity> activities) {
         Map<String, Integer> counts = new TreeMap<String, Integer>();
         for (TransformedActivity activity : activities) {
-            Integer previous = counts.get(activity.launchMode);
+            String profileAndMode = activity.windowProfile + ':' + activity.launchMode;
+            Integer previous = counts.get(profileAndMode);
             int count = previous == null ? 1 : previous.intValue() + 1;
             if (count > 8) {
                 throw new IllegalStateException(
-                        "Plugin declares more than 8 " + activity.launchMode
+                        "Plugin declares more than 8 " + activity.windowProfile + ' '
+                                + activity.launchMode
                                 + " Activities, exceeding the host container pool");
             }
-            counts.put(activity.launchMode, Integer.valueOf(count));
+            counts.put(profileAndMode, Integer.valueOf(count));
         }
     }
 
@@ -405,6 +408,7 @@ public final class ActivityJarTransformer {
         String superName;
         String launchMode = "STANDARD";
         String themeKey = "";
+        String windowProfile = "OPAQUE";
         String authority;
         ComponentKind kind;
         boolean publicNoArgConstructor;

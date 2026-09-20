@@ -6,11 +6,9 @@ import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.view.ContextThemeWrapper;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /** Host-owned immutable plugin Activity theme table. */
 public final class PluginThemeRegistry {
@@ -33,8 +31,8 @@ public final class PluginThemeRegistry {
             "windowActionBarOverlay",
             "windowNoTitle"
     };
-    private static final boolean[] OPAQUE_NO_ACTION_BAR_VALUES = {
-            false, false, false, false, false, true
+    private static final boolean[] COMMON_NO_ACTION_BAR_VALUES = {
+            false, false, false, false, true
     };
 
     private PluginThemeRegistry() {}
@@ -65,30 +63,59 @@ public final class PluginThemeRegistry {
 
     /** Resolves and validates one Activity contract without launching it. */
     public static void validateActivityTheme(String themeKey, String activityClassName) {
-        resolveActivityTheme(themeKey, activityClassName);
+        validateActivityTheme(themeKey, activityClassName, false);
+    }
+
+    /** Resolves and validates one Activity contract against its fixed Window profile. */
+    public static void validateActivityTheme(
+            String themeKey, String activityClassName, boolean translucent) {
+        resolveActivityTheme(themeKey, activityClassName, translucent);
     }
 
     /** Returns the real host style ID for one installed plugin Activity. */
     public static int resolveActivityTheme(String themeKey, String activityClassName) {
+        return resolveActivityTheme(themeKey, activityClassName, false);
+    }
+
+    /** Returns the real host style ID after verifying its fixed Window profile. */
+    public static int resolveActivityTheme(
+            String themeKey, String activityClassName, boolean translucent) {
         validateThemeKey(themeKey);
         return requireCatalog().resolve(
-                themeKey, Objects.requireNonNull(activityClassName, "activityClassName"));
+                themeKey,
+                Objects.requireNonNull(activityClassName, "activityClassName"),
+                translucent);
     }
 
     /** Prevents plugin code from applying an arbitrary style outside the immutable host table. */
     public static void requireRegisteredStyle(int styleResId) {
+        requireRegisteredStyle(styleResId, false);
+    }
+
+    /** Prevents a delegate from changing the fixed Window profile selected before launch. */
+    public static void requireRegisteredStyle(int styleResId, boolean translucent) {
         ResolvedCatalog current = requireCatalog();
-        if (!current.registeredStyleIds.contains(Integer.valueOf(styleResId))) {
+        Boolean registeredProfile = current.registeredStyleProfiles.get(Integer.valueOf(styleResId));
+        if (registeredProfile == null) {
             throw new IllegalArgumentException(
                     "Plugin Activity may only apply a host-registered theme; unknown style ID: 0x"
                             + Integer.toHexString(styleResId));
         }
         // The ID table is immutable, but a qualified style body can change with Configuration.
         // Recheck the fixed container profile before each actual application of the theme.
-        validateOpaqueTheme(
+        boolean currentProfile = resolveWindowProfile(
                 current.application,
                 "<registered:0x" + Integer.toHexString(styleResId) + '>',
                 styleResId);
+        if (registeredProfile.booleanValue() != currentProfile) {
+            throw new IllegalArgumentException(
+                    "Host plugin Activity style 0x" + Integer.toHexString(styleResId)
+                            + " changed Window profile across configurations; initialized="
+                            + profileName(registeredProfile.booleanValue()) + ", current="
+                            + profileName(currentProfile));
+        }
+        requireProfile("<registered:0x" + Integer.toHexString(styleResId) + '>',
+                currentProfile, translucent);
     }
 
     private static ResolvedCatalog requireCatalog() {
@@ -102,19 +129,19 @@ public final class PluginThemeRegistry {
     }
 
     private static ResolvedCatalog resolve(Application application, PluginHostConfig config) {
-        Integer defaultTheme = config.defaultActivityTheme == null
-                ? null : Integer.valueOf(resolveReference(
-                        application, "<host-default>", config.defaultActivityTheme));
-        Map<String, Integer> themes = new LinkedHashMap<String, Integer>();
+        ResolvedStyle defaultTheme = config.defaultActivityTheme == null
+                ? null : resolveReference(
+                        application, "<host-default>", config.defaultActivityTheme);
+        Map<String, ResolvedStyle> themes = new LinkedHashMap<String, ResolvedStyle>();
         for (Map.Entry<String, PluginHostConfig.ThemeReference> entry
                 : config.activityThemes.entrySet()) {
-            themes.put(entry.getKey(), Integer.valueOf(
-                    resolveReference(application, entry.getKey(), entry.getValue())));
+            themes.put(entry.getKey(),
+                    resolveReference(application, entry.getKey(), entry.getValue()));
         }
         return new ResolvedCatalog(application, config, defaultTheme, themes);
     }
 
-    private static int resolveReference(
+    private static ResolvedStyle resolveReference(
             Application application,
             String themeKey,
             PluginHostConfig.ThemeReference reference) {
@@ -130,8 +157,8 @@ public final class PluginThemeRegistry {
             }
         }
         validateStyleResource(resources, themeKey, styleResId);
-        validateOpaqueTheme(application, themeKey, styleResId);
-        return styleResId;
+        return new ResolvedStyle(
+                styleResId, resolveWindowProfile(application, themeKey, styleResId));
     }
 
     private static void validateStyleResource(
@@ -153,57 +180,95 @@ public final class PluginThemeRegistry {
     }
 
     @SuppressLint("ResourceType") // The array contains public attr IDs, not resource values.
-    private static void validateOpaqueTheme(
+    private static boolean resolveWindowProfile(
             Application application, String themeKey, int styleResId) {
         ContextThemeWrapper themed = new ContextThemeWrapper(application, styleResId);
         TypedArray values = themed.obtainStyledAttributes(STRUCTURAL_ATTRIBUTES);
         try {
-            for (int index = 0; index < STRUCTURAL_ATTRIBUTES.length; index++) {
-                boolean actual = values.getBoolean(index, !OPAQUE_NO_ACTION_BAR_VALUES[index]);
-                if (actual != OPAQUE_NO_ACTION_BAR_VALUES[index]) {
+            boolean translucent = values.getBoolean(0, false);
+            for (int index = 1; index < STRUCTURAL_ATTRIBUTES.length; index++) {
+                boolean expected = COMMON_NO_ACTION_BAR_VALUES[index - 1];
+                // Android treats an absent Window boolean as false. Native framework themes such
+                // as Theme.Translucent.NoTitleBar.Fullscreen therefore omit false-valued flags.
+                boolean actual = values.getBoolean(index, false);
+                if (actual != expected) {
                     throw new IllegalArgumentException(
                             "Plugin Activity themeKey " + themeKey + " has unsupported "
                                     + STRUCTURAL_ATTRIBUTE_NAMES[index] + '=' + actual
-                                    + "; the current container profile requires "
-                                    + OPAQUE_NO_ACTION_BAR_VALUES[index]);
+                                    + "; all plugin container profiles require " + expected);
                 }
             }
+            return translucent;
         } finally {
             values.recycle();
+        }
+    }
+
+    private static void requireProfile(
+            String themeKey, boolean actualTranslucent, boolean expectedTranslucent) {
+        if (actualTranslucent != expectedTranslucent) {
+            throw new IllegalArgumentException(
+                    "Plugin Activity themeKey " + themeKey + " uses "
+                            + profileName(actualTranslucent) + " Window structure, but the Activity "
+                            + "declares " + profileName(expectedTranslucent));
+        }
+    }
+
+    private static String profileName(boolean translucent) {
+        return translucent ? "TRANSLUCENT" : "OPAQUE";
+    }
+
+    private static final class ResolvedStyle {
+        final int resourceId;
+        final boolean translucent;
+
+        ResolvedStyle(int resourceId, boolean translucent) {
+            this.resourceId = resourceId;
+            this.translucent = translucent;
         }
     }
 
     private static final class ResolvedCatalog {
         final Application application;
         final PluginHostConfig config;
-        final Integer defaultTheme;
-        final Map<String, Integer> activityThemes;
-        final Set<Integer> registeredStyleIds;
+        final ResolvedStyle defaultTheme;
+        final Map<String, ResolvedStyle> activityThemes;
+        final Map<Integer, Boolean> registeredStyleProfiles;
 
         ResolvedCatalog(
                 Application application,
                 PluginHostConfig config,
-                Integer defaultTheme,
-                Map<String, Integer> activityThemes) {
+                ResolvedStyle defaultTheme,
+                Map<String, ResolvedStyle> activityThemes) {
             this.application = Objects.requireNonNull(application, "application");
             this.config = Objects.requireNonNull(config, "config");
             this.defaultTheme = defaultTheme;
             this.activityThemes = Collections.unmodifiableMap(
-                    new LinkedHashMap<String, Integer>(activityThemes));
-            Set<Integer> styleIds = new HashSet<Integer>(activityThemes.values());
-            if (defaultTheme != null) styleIds.add(defaultTheme);
-            this.registeredStyleIds = Collections.unmodifiableSet(styleIds);
+                    new LinkedHashMap<String, ResolvedStyle>(activityThemes));
+            Map<Integer, Boolean> styleProfiles = new LinkedHashMap<Integer, Boolean>();
+            if (defaultTheme != null) {
+                styleProfiles.put(
+                        Integer.valueOf(defaultTheme.resourceId),
+                        Boolean.valueOf(defaultTheme.translucent));
+            }
+            for (ResolvedStyle style : activityThemes.values()) {
+                styleProfiles.put(
+                        Integer.valueOf(style.resourceId), Boolean.valueOf(style.translucent));
+            }
+            this.registeredStyleProfiles = Collections.unmodifiableMap(styleProfiles);
         }
 
-        int resolve(String themeKey, String activityClassName) {
-            Integer style = themeKey.isEmpty() ? defaultTheme : activityThemes.get(themeKey);
+        int resolve(String themeKey, String activityClassName, boolean translucent) {
+            ResolvedStyle style = themeKey.isEmpty() ? defaultTheme : activityThemes.get(themeKey);
             if (style == null) {
                 String requested = themeKey.isEmpty() ? "<host-default>" : themeKey;
                 throw new IllegalStateException(
                         "Host has not registered plugin Activity themeKey " + requested
                                 + " required by " + activityClassName);
             }
-            return style.intValue();
+            requireProfile(themeKey.isEmpty() ? "<host-default>" : themeKey,
+                    style.translucent, translucent);
+            return style.resourceId;
         }
     }
 }

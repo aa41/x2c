@@ -52,7 +52,7 @@ codegen.jar
   宿主 ClassLoader。编译器自测同时覆盖 same-JAR 三层链、标注 compileOnly
   base/显式 include/普通宿主依赖 fallback、非 Activity 标注拒绝、外部 runtime dependency链、重复 class、resource AAR 和
   AndroidX fail-closed。generated registry 直接构造 delegate；
-  宿主 Manifest 只有 4 种 launchMode × 8 个
+  宿主 Manifest 只有 2 种 Window Profile × 4 种 launchMode × 8 个
   固定代理容器，不再使用 `AppComponentFactory`。loader 对插件业务类 plugin-first、miss 后回退宿主，对
   平台与全部 X2C/plugin runtime 强制 parent-first。模块 provider 按真实 loader 登记，Activity 使用自身
   class 精确取回对应 `X2cResources`。

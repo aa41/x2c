@@ -13,6 +13,7 @@ final class ActivityRegistryGenerator {
     private static final String REGISTRY = "dev/x2c/plugin/api/PluginComponentRegistry";
     private static final String INFO = "dev/x2c/plugin/api/PluginActivityInfo";
     private static final String MODE = "dev/x2c/plugin/api/PluginLaunchMode";
+    private static final String WINDOW_PROFILE = "dev/x2c/plugin/api/PluginWindowProfile";
     private static final String PROVIDER_INFO = "dev/x2c/plugin/api/PluginProviderInfo";
 
     private ActivityRegistryGenerator() {}
@@ -136,11 +137,17 @@ final class ActivityRegistryGenerator {
         method.visitFieldInsn(
                 Opcodes.GETSTATIC, MODE, activity.launchMode, "L" + MODE + ";");
         method.visitLdcInsn(activity.themeKey);
+        method.visitFieldInsn(
+                Opcodes.GETSTATIC,
+                WINDOW_PROFILE,
+                activity.windowProfile,
+                "L" + WINDOW_PROFILE + ";");
         method.visitMethodInsn(
                 Opcodes.INVOKESPECIAL,
                 INFO,
                 "<init>",
-                "(Ljava/lang/String;L" + MODE + ";Ljava/lang/String;)V",
+                "(Ljava/lang/String;L" + MODE + ";Ljava/lang/String;L"
+                        + WINDOW_PROFILE + ";)V",
                 false);
     }
 

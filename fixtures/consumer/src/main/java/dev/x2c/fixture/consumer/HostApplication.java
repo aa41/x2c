@@ -25,6 +25,9 @@ public final class HostApplication extends Application {
                             .activityTheme(
                                     "video.home.light.v1",
                                     R.style.HostPluginVideo)
+                            .activityTheme(
+                                    "component.translucent.v1",
+                                    R.style.HostPluginTranslucent)
                             .build());
             X2cImages.setLoader(new VerifiedHttpImageLoader());
             DynamicLibraryLoader.install(this);

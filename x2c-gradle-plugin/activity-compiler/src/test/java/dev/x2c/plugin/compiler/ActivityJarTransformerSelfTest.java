@@ -23,7 +23,7 @@ import org.objectweb.asm.Opcodes;
 
 public final class ActivityJarTransformerSelfTest {
     public static void main(String[] args) throws Exception {
-        require(ActivityJarTransformer.CURRENT_RUNTIME_ABI == 4,
+        require(ActivityJarTransformer.CURRENT_RUNTIME_ABI == 5,
                 "Activity runtime ABI must be bumped when the host/plugin bridge changes");
         Path root = Files.createTempDirectory("x2c-activity-transform-");
         try {
@@ -47,8 +47,10 @@ public final class ActivityJarTransformerSelfTest {
             verifyActivity(
                     classes.get("sample/FirstActivity.class"),
                     "SINGLE_TOP",
-                    "sample.detail.light.v1");
-            verifyActivity(classes.get("sample/SecondActivity.class"), "STANDARD", "");
+                    "sample.detail.light.v1",
+                    "TRANSLUCENT");
+            verifyActivity(
+                    classes.get("sample/SecondActivity.class"), "STANDARD", "", "OPAQUE");
             verifyActivityHierarchy(classes);
             verifySharedBaseHierarchy(classes);
             verifySuperclass(classes.get("sample/ProbeService.class"),
@@ -307,7 +309,7 @@ public final class ActivityJarTransformerSelfTest {
                 new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
             add(jar, "sample/FirstActivity.class", activity(
                     "sample/FirstActivity", "android/app/Activity", "SINGLE_TOP",
-                    "sample.detail.light.v1"));
+                    "sample.detail.light.v1", "TRANSLUCENT"));
             add(jar, "sample/SecondActivity.class", activity("sample/SecondActivity", null));
             add(jar, "sample/RootBaseActivity.class", baseActivity(
                     "sample/RootBaseActivity", "android/app/Activity"));
@@ -363,15 +365,24 @@ public final class ActivityJarTransformerSelfTest {
     }
 
     private static byte[] activity(String name, String launchMode) {
-        return activity(name, "android/app/Activity", launchMode, "");
+        return activity(name, "android/app/Activity", launchMode, "", "OPAQUE");
     }
 
     private static byte[] activity(String name, String superName, String launchMode) {
-        return activity(name, superName, launchMode, "");
+        return activity(name, superName, launchMode, "", "OPAQUE");
     }
 
     private static byte[] activity(
             String name, String superName, String launchMode, String themeKey) {
+        return activity(name, superName, launchMode, themeKey, "OPAQUE");
+    }
+
+    private static byte[] activity(
+            String name,
+            String superName,
+            String launchMode,
+            String themeKey,
+            String windowProfile) {
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
                 name, null, superName, null);
@@ -382,6 +393,12 @@ public final class ActivityJarTransformerSelfTest {
         }
         if (themeKey != null && !themeKey.isEmpty()) {
             annotation.visit("themeKey", themeKey);
+        }
+        if (windowProfile != null && !"OPAQUE".equals(windowProfile)) {
+            annotation.visitEnum(
+                    "windowProfile",
+                    "Ldev/x2c/plugin/api/PluginWindowProfile;",
+                    windowProfile);
         }
         annotation.visitEnd();
         MethodVisitor constructor = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
@@ -677,11 +694,15 @@ public final class ActivityJarTransformerSelfTest {
     }
 
     private static void verifyActivity(
-            byte[] bytes, String expectedMode, String expectedThemeKey) {
+            byte[] bytes,
+            String expectedMode,
+            String expectedThemeKey,
+            String expectedWindowProfile) {
         require(bytes != null, "Missing transformed Activity");
         final boolean[] rewrittenSuperCall = {false};
         final String[] launchMode = {"STANDARD"};
         final String[] themeKey = {""};
+        final String[] windowProfile = {"OPAQUE"};
         new ClassReader(bytes).accept(new ClassVisitor(Opcodes.ASM9) {
             @Override public void visit(
                     int version, int access, String name, String signature,
@@ -699,6 +720,7 @@ public final class ActivityJarTransformerSelfTest {
 
                     @Override public void visitEnum(String name, String descriptor, String value) {
                         if ("launchMode".equals(name)) launchMode[0] = value;
+                        if ("windowProfile".equals(name)) windowProfile[0] = value;
                     }
                 };
             }
@@ -721,6 +743,8 @@ public final class ActivityJarTransformerSelfTest {
         require(rewrittenSuperCall[0], "Activity super calls were not rewritten");
         require(expectedMode.equals(launchMode[0]), "Activity launchMode annotation changed");
         require(expectedThemeKey.equals(themeKey[0]), "Activity themeKey annotation changed");
+        require(expectedWindowProfile.equals(windowProfile[0]),
+                "Activity windowProfile annotation changed");
     }
 
     private static void verifyActivityHierarchy(Map<String, byte[]> classes) {

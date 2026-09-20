@@ -27,6 +27,8 @@ for task_payload in x2c-layout-showcase x2c-component-showcase; do
 done
 rg -q '"themeKey": "layout\.showcase\.light\.v1"' "$task_layout_component_report"
 rg -q '"themeKey": "video\.home\.light\.v1"' "$task_showcase_component_report"
+rg -q '"themeKey": "component\.translucent\.v1"' "$task_showcase_component_report"
+rg -q '"windowProfile": "TRANSLUCENT"' "$task_showcase_component_report"
 rg -q 'Ldev/x2c/fixture/producer/DemoActivity;' "$task_tmp/x2c-layout-showcase.classes"
 for task_type in VideoHomeActivity VideoDetailActivity ComponentShowcaseActivity ComponentProbeService ComponentProbeReceiver ComponentProbeProvider; do
     rg -q "Ldev/x2c/fixture/secondary/$task_type;" "$task_tmp/x2c-component-showcase.classes"

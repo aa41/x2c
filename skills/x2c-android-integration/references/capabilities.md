@@ -106,11 +106,13 @@ LinearLayout.
 
 Activity themes follow the component creation model, not the XML-to-Java resource model. Normal
 Activities are framework components and use the merged Manifest's Activity theme, falling back to
-the application theme. Plugin Activities are delegates and use only `@X2cPluginActivity.themeKey`
-mapped to a real host-packaged style. Plugin Manifest themes are neither packaged nor consulted.
+the application theme. Plugin Activities are delegates: `@X2cPluginActivity.themeKey` maps to a
+real host-packaged style, while `windowProfile` selects an Opaque or Translucent fixed Manifest
+container before creation. Plugin Manifest themes are neither packaged nor consulted. Host-native
+Styles can be registered directly when their resolved structure matches the declared profile.
 
-- Activity: standard, singleTop, singleTask, and singleInstance; lifecycle/result/new-intent and a
-  documented subset of Activity APIs are bridged.
+- Activity: Opaque and Translucent profiles across standard, singleTop, singleTask, and
+  singleInstance; lifecycle/result/new-intent and a documented subset of Activity APIs are bridged.
 - Service: started and bound service flow plus foreground/self-stop bridges; 8 process-wide slots.
 - BroadcastReceiver: explicit normal/ordered routing, result state, abort state, and `goAsync`.
 - ContentProvider: virtual authority with supported CRUD, call, batch, observer, and file routes;

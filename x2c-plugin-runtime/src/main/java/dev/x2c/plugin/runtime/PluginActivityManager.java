@@ -9,6 +9,7 @@ import android.os.Bundle;
 import dev.x2c.plugin.api.PluginActivityInfo;
 import dev.x2c.plugin.api.PluginActivityRegistry;
 import dev.x2c.plugin.api.PluginLaunchMode;
+import dev.x2c.plugin.api.PluginWindowProfile;
 import dev.x2c.runtime.PluginThemeRegistry;
 import java.util.Collections;
 import java.util.HashMap;
@@ -58,23 +59,26 @@ public final class PluginActivityManager {
         Objects.requireNonNull(registry, "registry");
         PluginActivityInfo[] activities = Objects.requireNonNull(
                 registry.activities(), "Plugin Activity registry returned null activities");
-        if (activities.length > 32) {
+        if (activities.length > 64) {
             throw new IllegalStateException(
-                    "Plugin declares more than 32 Activities, exceeding the host container pool");
+                    "Plugin declares more than 64 Activities, exceeding the host container pool");
         }
         Set<String> names = new HashSet<String>();
-        int[] launchModeCounts = new int[PluginLaunchMode.values().length];
+        int[][] profileLaunchModeCounts = new int[
+                PluginWindowProfile.values().length][PluginLaunchMode.values().length];
         for (PluginActivityInfo activity : activities) {
             if (activity == null) {
                 throw new IllegalStateException("Plugin Activity registry contains null metadata");
             }
             String className = requireText(activity.className, "Activity className");
             Objects.requireNonNull(activity.launchMode, "Activity launchMode");
-            int launchModeCount = ++launchModeCounts[activity.launchMode.ordinal()];
+            Objects.requireNonNull(activity.windowProfile, "Activity windowProfile");
+            int launchModeCount = ++profileLaunchModeCounts[activity.windowProfile.ordinal()]
+                    [activity.launchMode.ordinal()];
             if (launchModeCount > SLOTS_PER_LAUNCH_MODE) {
                 throw new IllegalStateException(
                         "Plugin declares more than " + SLOTS_PER_LAUNCH_MODE + ' '
-                                + activity.launchMode
+                                + activity.windowProfile + ' ' + activity.launchMode
                                 + " Activities, exceeding the host container pool");
             }
             if (!activity.themeKey.isEmpty()) {
@@ -93,7 +97,8 @@ public final class PluginActivityManager {
                     registry.info(className), "Plugin Activity registry returned null info");
             if (!className.equals(lookup.className)
                     || activity.launchMode != lookup.launchMode
-                    || !activity.themeKey.equals(lookup.themeKey)) {
+                    || !activity.themeKey.equals(lookup.themeKey)
+                    || activity.windowProfile != lookup.windowProfile) {
                 throw new IllegalStateException(
                         "Plugin Activity registry returned inconsistent metadata for "
                                 + className);
@@ -184,11 +189,18 @@ public final class PluginActivityManager {
         return activity;
     }
 
-    static int resolveActivityTheme(Intent containerIntent) {
+    static int resolveActivityTheme(Intent containerIntent, boolean translucentContainer) {
         String pluginId = requireExtra(containerIntent, EXTRA_PLUGIN_ID);
         String target = requireExtra(containerIntent, EXTRA_TARGET_ACTIVITY);
         PluginActivityInfo info = requirePlugin(pluginId).requireInfo(target);
-        return PluginThemeRegistry.resolveActivityTheme(info.themeKey, info.className);
+        boolean translucentActivity = isTranslucent(info.windowProfile);
+        if (translucentActivity != translucentContainer) {
+            throw new IllegalStateException(
+                    "Plugin Activity Window profile does not match its allocated host container: "
+                            + info.className + " declares " + info.windowProfile);
+        }
+        return PluginThemeRegistry.resolveActivityTheme(
+                info.themeKey, info.className, translucentActivity);
     }
 
     static Intent requirePluginIntent(Intent containerIntent) {
@@ -204,7 +216,7 @@ public final class PluginActivityManager {
         PluginActivityInfo info = installed.requireInfo(
                 requireText(target, "activityClassName"));
         Class<? extends PluginContainerActivity> container = allocateContainer(
-                pluginId, target, info.launchMode);
+                pluginId, target, info.windowProfile, info.launchMode);
         Intent result = new Intent(context, container);
         result.setFlags(pluginIntent.getFlags());
         result.putExtra(EXTRA_PLUGIN_ID, pluginId);
@@ -243,8 +255,16 @@ public final class PluginActivityManager {
     }
 
     private static Class<? extends PluginContainerActivity> allocateContainer(
-            String pluginId, String target, PluginLaunchMode mode) {
-        return PluginContainerPool.container(mode, SLOTS.allocate(pluginId, target, mode));
+            String pluginId,
+            String target,
+            PluginWindowProfile profile,
+            PluginLaunchMode mode) {
+        return PluginContainerPool.container(
+                profile, mode, SLOTS.allocate(pluginId, target, profile, mode));
+    }
+
+    static boolean isTranslucent(PluginWindowProfile profile) {
+        return profile == PluginWindowProfile.TRANSLUCENT;
     }
 
     private static String requireExtra(Intent intent, String name) {

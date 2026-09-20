@@ -18,7 +18,8 @@ public abstract class PluginContainerActivity extends Activity {
     private Resources.Theme bootstrapTheme;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
-        activatePluginTheme(PluginActivityManager.resolveActivityTheme(getIntent()));
+        activatePluginTheme(PluginActivityManager.resolveActivityTheme(
+                getIntent(), isTranslucentContainer()));
         pluginActivity = PluginActivityManager.createDelegate(this, getIntent());
         pluginActivity.performCreate(savedInstanceState);
     }
@@ -42,12 +43,12 @@ public abstract class PluginContainerActivity extends Activity {
             // Theme object until the target plugin Activity and its host-owned theme are known.
             return;
         }
-        PluginThemeRegistry.requireRegisteredStyle(resId);
+        PluginThemeRegistry.requireRegisteredStyle(resId, isTranslucentContainer());
         super.setTheme(resId);
     }
 
     private void activatePluginTheme(int styleResId) {
-        PluginThemeRegistry.requireRegisteredStyle(styleResId);
+        PluginThemeRegistry.requireRegisteredStyle(styleResId, isTranslucentContainer());
         pluginThemeActive = true;
         bootstrapTheme = null;
         try {
@@ -201,10 +202,24 @@ public abstract class PluginContainerActivity extends Activity {
     final void superOnUserInteraction() { super.onUserInteraction(); }
     final void superOnUserLeaveHint() { super.onUserLeaveHint(); }
 
+    abstract boolean isTranslucentContainer();
+
     private PluginActivity requirePlugin() {
         if (pluginActivity == null) {
             throw new IllegalStateException("Plugin delegate has not been created");
         }
         return pluginActivity;
+    }
+}
+
+abstract class OpaquePluginContainerActivity extends PluginContainerActivity {
+    @Override final boolean isTranslucentContainer() {
+        return false;
+    }
+}
+
+abstract class TranslucentPluginContainerActivity extends PluginContainerActivity {
+    @Override final boolean isTranslucentContainer() {
+        return true;
     }
 }

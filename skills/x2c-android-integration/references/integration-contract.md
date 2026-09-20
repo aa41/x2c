@@ -81,12 +81,12 @@ If a hardening SDK installs a stable host ClassLoader later, use the explicit ov
 that transition is complete. Normal AAR-only hosts use `X2C.init(...)` instead. Initialization must
 precede plugin loader creation and all resource access.
 
-Activity theme ownership is deliberately different by mode:
+Activity theme and Window-profile ownership is deliberately different by mode:
 
-| Mode | Theme source | Ignored source |
+| Mode | Theme/Window source | Ignored source |
 |---|---|---|
 | normal AAR | merged Manifest Activity `android:theme`; otherwise application theme | `@X2cPluginActivity.themeKey` |
-| dynamic plugin | annotation `themeKey` resolved through host `PluginHostConfig` | plugin Manifest Activity/theme declarations |
+| dynamic plugin | annotation `themeKey` resolved through host `PluginHostConfig`; `windowProfile` selects an Opaque or Translucent host container | plugin Manifest Activity/theme declarations |
 
 This remains true when one host APK contains both kinds of feature. Such an Application may need
 the `PluginHostConfig` overload for its dynamic plugins, but native normal Activities still receive

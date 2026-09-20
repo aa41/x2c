@@ -136,6 +136,7 @@ public abstract class TransformPluginActivitiesTask extends DefaultTask {
             json.append("    {\"className\": \"").append(escape(activity.className))
                     .append("\", \"launchMode\": \"").append(activity.launchMode)
                     .append("\", \"themeKey\": \"").append(escape(activity.themeKey))
+                    .append("\", \"windowProfile\": \"").append(activity.windowProfile)
                     .append("\"}");
             if (index + 1 < result.activities.size()) json.append(',');
             json.append('\n');

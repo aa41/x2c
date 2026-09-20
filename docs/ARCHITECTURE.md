@@ -2,7 +2,7 @@
 
 > 文档状态：As-built architecture + production roadmap
 >
-> 基线版本：`0.2.0-SNAPSHOT`
+> 基线版本：`0.3.0-SNAPSHOT`
 >
 > 更新日期：2026-09-16
 
@@ -348,12 +348,15 @@ X2C.init(
         PluginHostConfig.builder()
                 .defaultActivityTheme(R.style.HostPluginDefault)
                 .activityTheme("commerce.detail.light.v1", R.style.HostPluginCommerceDetail)
+                .activityTheme("commerce.dialog.v1", R.style.HostNativeTranslucentDialog)
                 .build());
 ```
 
 `X2C.init` 同时发布基础宿主状态和不可变的 Activity 主题表。直接 ID 会校验为真实 style；名称只在
 首次初始化时通过宿主 package 的 `Resources.getIdentifier` 解析一次。插件 metadata 只携带稳定
-`themeKey`，安装时验证全部 key，启动时容器在 delegate `onCreate` 前应用对应宿主主题。`X2C` 保存
+`themeKey` 与 `windowProfile`。主题表初始化时将 Style 分类为 Opaque/Translucent；组件安装时验证 Style
+分类与 Activity 声明一致；启动时按 `windowProfile + launchMode + slot` 选择 Manifest 容器，并在 delegate
+`onCreate` 前应用对应宿主主题。宿主原生 Style 可直接注册，不要求继承 X2C Style。`X2C` 保存
 application Context、宿主 package name 和宿主 ClassLoader，并通过 volatile 快路径与同步锁保证只发布一次。
 loader、generated module、组件或资源访问只调用 `requireInitialized`，不会重复绑定 Context。normal AAR
 模式不启用组件主题协议，仍单独调用 `X2C.init(...)`。
@@ -361,7 +364,7 @@ loader、generated module、组件或资源访问只调用 `requireInitialized`�
 | Activity 创建模式 | 主题来源 | 明确不生效的来源 |
 |---|---|---|
 | normal AAR 原生组件 | 合并后 Manifest 的 Activity `android:theme`；缺省时继承 application theme | `@X2cPluginActivity.themeKey` |
-| 动态插件 delegate | `themeKey` -> 宿主不可变 `PluginHostConfig` | 插件 Manifest Activity/theme |
+| 动态插件 delegate | `themeKey` -> 宿主不可变 `PluginHostConfig`；`windowProfile` -> 固定 Manifest 容器 | 插件 Manifest Activity/theme |
 
 一个宿主同时承载两种模式时也不会交叉覆盖：宿主可以为动态插件初始化主题表，但原生 normal Activity
 仍由 Android framework 按最终 merged Manifest 选择主题。
@@ -490,7 +493,8 @@ X2cResources resources = X2C.resources(PluginActivityClass.class);
 
 ### 7.3 Activity
 
-宿主 Manifest 预留四种 launchMode 各八个非导出容器。当前支持：
+宿主 Manifest 为 `OPAQUE`、`TRANSLUCENT` 两种 Window Profile 分别预留四种 launchMode 各八个
+非导出容器，共 64 个。当前支持：
 
 - standard、singleTop、singleTask、singleInstance；
 - 构造、attach、完整常用生命周期和 Window/content bridge；

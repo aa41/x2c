@@ -12,6 +12,12 @@ public @interface X2cPluginActivity {
     PluginLaunchMode launchMode() default PluginLaunchMode.STANDARD;
 
     /**
+     * Fixed host container Window structure. This must match the host style selected by
+     * {@link #themeKey()} before the delegate is created.
+     */
+    PluginWindowProfile windowProfile() default PluginWindowProfile.OPAQUE;
+
+    /**
      * Stable host theme contract key. An empty value requests the host's default plugin Activity
      * theme; the plugin never embeds or persists a host resource ID.
      */

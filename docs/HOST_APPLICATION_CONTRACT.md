@@ -14,17 +14,20 @@ X2C.init(
         PluginHostConfig.builder()
                 .defaultActivityTheme(R.style.HostPluginDefault)
                 .activityTheme("commerce.detail.light.v1", R.style.HostPluginCommerceDetail)
+                .activityTheme("commerce.dialog.v1", R.style.HostNativeTranslucentDialog)
                 .activityTheme("video.home.dark.v1", "HostPluginVideoDark")
                 .build());
 ```
 
-配置构建后不可变。Activity payload 只保存稳定 `themeKey`；安装时必须能从宿主表解析到真实 style ID。
+配置构建后不可变。Activity payload 保存稳定 `themeKey` 与 `windowProfile`；安装时必须能从宿主表解析到
+真实 style ID，且 Style 的窗口结构必须与 `OPAQUE`/`TRANSLUCENT` 声明一致。
 直接 `R.style` 注册优先；字符串注册只允许宿主本地 style entry，并仅在首次初始化时调用一次
 `Resources.getIdentifier(name, "style", hostPackage)`。名称解析的 style 在开启资源裁剪时需要静态引用或
-`tools:keep`。缺少默认/keyed 主题、名称不存在、ID 不是 style，或主题改变固定容器的
-translucent/floating/NoDisplay/ActionBar 结构都会 fail closed。插件 Manifest 中的 Activity theme 不参与协议。
-宿主主题推荐直接继承 `@style/X2cPluginContainer.Opaque`，并让全部 qualifier 变体保持相同窗口结构。
-style ID 只解析一次；runtime 会在每次真正应用主题前按当前 Configuration 重新检查结构属性。
+`tools:keep`。宿主已有的原生 Style 可直接注册，无需修改 parent；也可以继承
+`X2cPluginContainer.Opaque` 或 `X2cPluginContainer.Translucent`。缺少默认/keyed 主题、名称不存在、ID
+不是 style、Profile 不匹配，或 floating/NoDisplay/ActionBar 结构都会 fail closed。插件 Manifest 中的
+Activity theme 不参与协议。全部 qualifier 变体必须保持相同 Profile；style ID 只解析一次，runtime 会在
+每次真正应用主题前按当前 Configuration 重新检查结构属性。
 
 主题来源严格按组件创建模式隔离：normal AAR Activity 只使用合并后 Manifest 中自身的
 `android:theme`，未声明时继承 application theme；即使源码保留 `@X2cPluginActivity`，其
@@ -53,6 +56,6 @@ style ID 只解析一次；runtime 会在每次真正应用主题前按当前 Co
 
 Application/ClassLoader 身份契约引入时组件 runtime ABI 提升为 2。receiver-aware final Activity API bridge
 和 `setFinishOnTouchOutside` 容器转发曾把协议提升为 3；宿主主题 key/metadata 契约进一步将当前 ABI
-提升为 4。ABI 1/2/3 载荷会被
+提升为 4；双 Window Profile 容器与 metadata 契约将当前 ABI 提升为 5。ABI 1/2/3/4 载荷会被
 现有安装检查拒绝，需使用新编译插件重新构建，不应跳过 ABI 检查。仍需针对具体加固产品验证 DEX 加载、
 组件、资源重命名等策略，普通设备回归不是厂商兼容认证。

@@ -73,7 +73,10 @@ public final class PluginComponentManager {
         dev.x2c.runtime.X2C.requireInitialized(context);
         PluginActivityInfo[] activities = PluginActivityManager.validateActivities(registry);
         for (PluginActivityInfo activity : activities) {
-            PluginThemeRegistry.validateActivityTheme(activity.themeKey, activity.className);
+            PluginThemeRegistry.validateActivityTheme(
+                    activity.themeKey,
+                    activity.className,
+                    PluginActivityManager.isTranslucent(activity.windowProfile));
         }
         dev.x2c.runtime.X2C.registerPluginClassLoader(pluginClassLoader);
 

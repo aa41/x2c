@@ -25,6 +25,7 @@ task_dex="$task_root/fixtures/producer/build/outputs/x2c/release/codegen-dex.jar
 
 rg -q '"mode": "PLUGIN_SYNTHETIC_IDS"' "$task_plugin_report"
 rg -q '"themeKey": "layout\.showcase\.light\.v1"' "$task_plugin_component_report"
+rg -q '"windowProfile": "OPAQUE"' "$task_plugin_component_report"
 [[ $(jar tf "$task_dex") == "classes.dex" ]]
 
 "$task_root/scripts/build-x2c-artifact.sh" \

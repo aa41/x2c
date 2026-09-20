@@ -94,8 +94,9 @@ project. It defines the modules, artifacts, DSL, ownership, and runtime API shar
 - Activity theme sources are mode-exclusive. Normal components use only the merged Android
   Manifest (`activity android:theme`, then application theme) and ignore
   `@X2cPluginActivity.themeKey`. Plugin Activities use only `themeKey` plus the immutable host
-  theme table; a plugin Manifest component/theme declaration is invalid and must never be used as
-  fallback.
+  theme table and declare their fixed `OPAQUE`/`TRANSLUCENT` structure with `windowProfile`.
+  The resolved host Style must match that profile; a plugin Manifest component/theme declaration
+  is invalid and must never be used as fallback.
 - Plugin bitmap upload is an external CI step. The build only consumes an immutable HTTPS/SHA-256
   asset lock. Never read upload credentials or perform network uploads as part of Gradle codegen.
 - Synthetic `R2.id` values are View IDs, not `resources.arsc` entries. They support View identity,

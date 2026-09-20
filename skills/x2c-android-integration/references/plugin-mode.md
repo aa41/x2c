@@ -14,13 +14,15 @@ is a DEX JAR without Android resources, assets, JNI, or Manifest components.
    API visible to source. The payload must not contain those host-owned classes.
 4. Keep the plugin Manifest free of business Activity, Service, Receiver, and Provider declarations.
    The host runtime AAR contributes fixed non-exported containers. Plugin Activity themes never
-   come from a plugin Manifest; only `@X2cPluginActivity.themeKey` selects a host-registered style.
+   come from a plugin Manifest; `@X2cPluginActivity.themeKey` selects a host-registered style and
+   `windowProfile` selects the compatible Opaque or Translucent container family.
 5. Mark only concrete plugin component entries:
 
    ```java
    @X2cPluginActivity(
            launchMode = PluginLaunchMode.SINGLE_TOP,
-           themeKey = "commerce.detail.light.v1")
+           themeKey = "commerce.dialog.v1",
+           windowProfile = PluginWindowProfile.TRANSLUCENT)
    public final class DetailActivity extends Activity { }
 
    @X2cPluginService
@@ -81,16 +83,18 @@ is a DEX JAR without Android resources, assets, JNI, or Manifest components.
            PluginHostConfig.builder()
                    .defaultActivityTheme(R.style.HostPluginDefault)
                    .activityTheme("commerce.detail.light.v1", R.style.HostPluginCommerceDetail)
+                   .activityTheme("commerce.dialog.v1", R.style.HostNativeTranslucentDialog)
                    .activityTheme("video.home.dark.v1", "HostPluginVideoDark")
                    .build());
    ```
 
    Prefer direct `R.style` IDs. The string overload resolves a local host style once with
    `getIdentifier`; keep name-only styles with a static reference or `tools:keep` when shrinking.
-   Missing keys and structurally incompatible translucent/floating/NoDisplay/ActionBar themes fail
-   before Activity launch. Host themes should inherit `X2cPluginContainer.Opaque`, with the same
-   window structure in every qualifier variant. Install the image loader before plugin UI requests
-   images.
+   Existing host-native Styles can be registered directly. The runtime classifies each Style as
+   Opaque or Translucent and rejects a mismatch with the Activity's `windowProfile` before launch.
+   Floating, NoDisplay, ActionBar, and qualifier variants that change profile fail closed. New
+   host styles may inherit `X2cPluginContainer.Opaque` or `X2cPluginContainer.Translucent`.
+   Install the image loader before plugin UI requests images.
 3. Verify the signed descriptor and payload with `SignedPluginInstaller` before creating the
    `PluginClassLoader`. Production private keys belong in an external publisher/CI signer; the APK
    pins public keys only.
@@ -128,8 +132,9 @@ arbitrary class name from untrusted metadata is not a safe discovery mechanism.
 
 ## Capacity and lifecycle boundaries
 
-- Activity containers: 8 slots for each of four launch modes, process-wide. `standard` can create
-  multiple instances per assigned slot; distinct targets still consume assignment capacity.
+- Activity containers: 8 slots for each `windowProfile + launchMode` pair, process-wide (64 fixed
+  declarations total). `standard` can create multiple instances per assigned slot; distinct
+  targets still consume assignment capacity.
 - Service containers: 8 process-wide.
 - Receivers are explicit/non-exported routes. Ordered state and `goAsync()` are bridged.
 - Providers use virtual authorities and a supported ContentResolver subset. Unsupported caller
@@ -146,7 +151,7 @@ arbitrary class name from untrusted metadata is not a safe discovery mechanism.
   `host-resource-dependencies=inferred-and-preflighted` invariant. Generated module initialization
   verifies every inferred host name/type before publishing its layouts.
 - `activities.json` contains the expected registry, ABI, dependencies, and every annotated
-  component, including each Activity `themeKey`.
+  component, including each Activity `themeKey` and `windowProfile`.
 - `codegen.jar` and `activity-plugin.jar` contain classes only.
 - `codegen-dex.jar` contains a valid `classes.dex` and no runtime or resource payload.
 - A cold host process verifies, installs, loads, registers, and launches the plugin. Upgrade and

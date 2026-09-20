@@ -53,15 +53,16 @@ At minimum verify on a cold process:
   before ClassLoader creation;
 - runtime classes resolve from the host loader while plugin entries resolve from their own loader;
 - `X2C.hostApplication()` is the real Application and initialization ran once;
-- every Activity entry in `activities.json` has the expected `themeKey`; every non-empty key and
-  the default path are registered in `PluginHostConfig`; the resolved host styles survive resource
-  shrinking and keep the required opaque/no-ActionBar window structure;
+- every Activity entry in `activities.json` has the expected `themeKey` and `windowProfile`; every
+  non-empty key and the default path are registered in `PluginHostConfig`; the resolved host styles
+  survive resource shrinking and keep the declared Opaque/Translucent no-ActionBar structure;
 - plugin launch visibly applies the selected host style before delegate `onCreate`, while plugin
   Manifest Activity/theme declarations remain absent;
 - two plugin IDs/generated packages can install sequentially without module/resource collision;
 - plugin-declared resources win, host-only supported resources fall back, synthetic IDs work with
   `findViewById` and keyed tags, and CDN images pass integrity checks;
-- every annotated Activity launch mode, result/new-intent path, started/bound Service, ordered/
+- both Window profiles and every annotated Activity launch mode, result/new-intent path,
+  started/bound Service, ordered/
   asynchronous Receiver, and supported Provider path works when used;
 - plugin-to-host, same-plugin, and cross-plugin navigation follows the explicit routing contract;
 - a pending upgrade activates only after process restart and failed activation returns to a

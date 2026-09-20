@@ -5,8 +5,9 @@
 本文只描述 Activity 子协议。Service、BroadcastReceiver、ContentProvider 的代理、安全边界和验证见
 [Android 插件组件协议](PLUGIN_COMPONENTS.md)。插件的 library Manifest 必须保持无业务组件声明，宿主只合并
 runtime 预声明的固定非导出代理容器。
-Activity 主题同样不从插件 Manifest 读取：只有 `@X2cPluginActivity.themeKey` 会进入
-`activities.json`，并由宿主 `PluginHostConfig` 映射为真实 style。normal AAR 中相同注解不生效，
+Activity 主题同样不从插件 Manifest 读取：`@X2cPluginActivity.themeKey` 与 `windowProfile` 会进入
+`activities.json`；前者由宿主 `PluginHostConfig` 映射为真实 style，后者在 framework 创建 Activity 前
+选择 `OPAQUE` 或 `TRANSLUCENT` Manifest 容器。normal AAR 中相同注解不生效，
 原生 Activity 继续遵循合并后的 Manifest theme。
 
 插件开发代码仍使用正常的 framework 类型：
@@ -14,7 +15,8 @@ Activity 主题同样不从插件 Manifest 读取：只有 `@X2cPluginActivity.t
 ```java
 @X2cPluginActivity(
         launchMode = PluginLaunchMode.SINGLE_TOP,
-        themeKey = "commerce.detail.light.v1")
+        themeKey = "commerce.dialog.v1",
+        windowProfile = PluginWindowProfile.TRANSLUCENT)
 public final class DetailActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -65,8 +67,8 @@ public abstract class BusinessBaseActivity extends Activity { /* ... */ }
 明确声明的插件私有闭包。普通 compileOnly 引用
 不会复制进 payload；插件 ClassLoader 查找不到时会自动交给宿主 ClassLoader。仅宿主
 BaseActivity、AppCompat/FragmentActivity/ComponentActivity 仍会在 Activity 继承闭包
-无法闭合时构建失败。遗漏入口注解、单
-launchMode 超过 8 个、未知组件或不安全 final API 同样 fail closed。
+无法闭合时构建失败。遗漏入口注解、单个 `windowProfile + launchMode` 超过 8 个、未知组件或不安全
+final API 同样 fail closed。
 
 marker 来自 `x2c-plugin-api`，业务 base project 对它使用 `compileOnly`，不会把 API 打入宿主或插件副本。
 
@@ -106,7 +108,7 @@ Android/Java 平台包强制 parent-first，避免 singleton 与类型身份分�
 
 插件宿主在真实 `Application.onCreate` 或加固 SDK 确认环境就绪后调用
 `X2C.init(application, PluginHostConfig)`；它同时初始化基础 runtime 并一次性解析宿主拥有的
-Activity 主题表。组件 runtime ABI 4 的 Application、主题与代码身份契约见
+Activity 主题表。组件 runtime ABI 5 的 Application、主题、Window Profile 与代码身份契约见
 [HOST_APPLICATION_CONTRACT](HOST_APPLICATION_CONTRACT.md)。插件安装器、generated `X2cModule`、Activity 和资源访问只验证宿主已经
 初始化，不再重复绑定 Context/ClassLoader。每个插件 module 的 Provider/Layout registry 在首次 load 时
 初始化一次，并缓存业务 anchor class 到 module 的映射；后续 `X2C.resources(Activity.class)` 不再执行
@@ -123,7 +125,7 @@ bootstrap 反射。
 
 ## 代理池与 launchMode
 
-宿主 Manifest 声明 32 个不可导出的真实 Activity：
+宿主 Manifest 声明 64 个不可导出的真实 Activity：`OPAQUE` 与 `TRANSLUCENT` 两种 Profile，各自包含：
 
 | launchMode | 容器数 |
 |---|---:|
@@ -132,7 +134,8 @@ bootstrap 反射。
 | `singleTask` | 8 |
 | `singleInstance` | 8 |
 
-slot 对 `pluginId/activityClass` 稳定分配。容量是全进程每种 8 个，不是每插件各 8 个；同一 mode 下第 9 个
+slot 对 `pluginId/activityClass` 稳定分配。容量是全进程每个 `Profile + launchMode` 8 个，不是每插件各
+8 个；同一组合下第 9 个
 不同目标会明确失败。`standard` 的同一代理 class 仍可由 Android 建立多个实例；其他三种模式依靠不同代理
 class 隔离系统 task 语义。当前不支持热卸载；slot 随应用进程结束统一释放，升级必须进入新进程。
 
@@ -222,9 +225,9 @@ Play 的 Device and Network Abuse 政策通常禁止应用从 Google Play 之外
   非 Activity 标注根和未标注外部基类拒绝、基类 final API bridge、
   direct Activity 与 lifecycle super call、跨 helper final API callsite、annotation/launchMode、direct registry、
   deterministic JAR、遗漏 annotation、无法桥接的 final API 和 8-slot 上限 fail-closed；
-- runtime 单测：四种 mode 独立分配、同 key 稳定、全进程每 mode 8 个、uninstall 回收；
+- runtime 单测：两种 Profile × 四种 mode 独立分配、同 key 稳定、全进程每个组合 8 个、uninstall 回收；
 - loader 自测：descriptor round-trip、RSA 验签、metadata 篡改拒绝；
-- fixture：两个物理 DEX JAR、两个 ClassLoader、两个 registry、Layout/资源/图片页和四大组件页、32 个 Manifest 容器；
+- fixture：两个物理 DEX JAR、两个 ClassLoader、两个 registry、Layout/资源/图片页和四大组件页、64 个 Manifest Activity 容器；
 - ADB 导航测试：宿主/同插件/跨插件/宿主回跳、plugin Activity Result、四种 launchMode/new-intent；Layout 页
   同时验证公共插件 base 与业务类由不同 ClassLoader 持有；
 - `scripts/verify.sh`：JAR/DEX/Manifest/签名 envelope/宿主隔离/确定性检查；

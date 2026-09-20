@@ -93,12 +93,15 @@ creation, even when the same host APK also loads dynamic plugins.
 
 ### Plugin Activity theme is missing or rejected
 
-Inspect `activities.json` for the exact `themeKey`, then inspect the one process-wide
+Inspect `activities.json` for the exact `themeKey` and `windowProfile`, then inspect the one process-wide
 `PluginHostConfig` built before plugin installation. Plugin Manifest theme declarations are
 intentionally ignored and business component declarations there are rejected. For a non-empty key,
 register an exact host mapping; for an empty key, register a default theme. A name-based style must
-exist in the host package and survive shrinking. Translucent, floating, NoDisplay, ActionBar, or
-qualifier variants that change the fixed container window structure fail closed.
+exist in the host package and survive shrinking. A Style classified as Translucent requires
+`PluginWindowProfile.TRANSLUCENT`; Opaque requires the default/explicit Opaque profile. Floating,
+NoDisplay, ActionBar, or qualifier variants that change the fixed profile fail closed. Do not work
+around a mismatch with business-side `setTheme()` because the framework chooses translucency from
+the Manifest container before delegate `onCreate`.
 
 ### Process death loses navigation/state
 

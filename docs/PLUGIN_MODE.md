@@ -77,7 +77,8 @@ x2c {
   仍必须由插件声明，未知名称保持构建期失败。
 - 宿主只在真实 `Application` 初始化一次
   `X2C.init(application, PluginHostConfig)`。插件 Activity 通过 `themeKey` 选择宿主预注册的
-  真实 `R.style`；字符串 style name 只在初始化时经 `getIdentifier` 解析一次。完成初始化、验签并创建
+  真实 `R.style`，通过 `windowProfile` 声明 `OPAQUE` 或 `TRANSLUCENT` 容器；字符串 style name 只在
+  初始化时经 `getIdentifier` 解析一次。宿主已有 Style 可直接注册，安装阶段会校验 Profile。完成初始化、验签并创建
   ClassLoader 后调用：
 
 ```java
@@ -132,7 +133,7 @@ unzip -l library/build/outputs/aar/library-release.aar
 | runtime/base 依赖 | `compileOnly`，宿主持有 | `api`/`implementation` |
 | 业务组件 Manifest | 不声明 | 正常声明 |
 | 组件 annotation/transform | 使用 | 不执行 transform |
-| Activity 主题来源 | `themeKey` -> 宿主不可变主题表 | 合并后的 Manifest `android:theme` |
+| Activity 主题来源 | `themeKey` -> 宿主不可变主题表；`windowProfile` -> 固定容器 | 合并后的 Manifest `android:theme` |
 | 位图 | asset lock + CDN | 保留在 AAR |
 | 加载 | 验签、独立 ClassLoader、`PluginComponentManager` | application ClassLoader |
 

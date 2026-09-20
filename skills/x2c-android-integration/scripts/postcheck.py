@@ -214,13 +214,25 @@ def check_components(report: Report, path: Path, activity_jar: Path) -> None:
             report.add("BLOCKER", "component-list", f"Component report field {key} is missing or invalid", str(path))
     activities = data.get("activities")
     if isinstance(activities, list):
-        per_mode: Dict[str, int] = {}
+        per_profile_mode: Dict[str, int] = {}
         keyed = 0
         defaults = 0
+        profiles: Dict[str, int] = {}
         for item in activities:
             if isinstance(item, dict):
                 launch_mode = str(item.get("launchMode"))
-                per_mode[launch_mode] = per_mode.get(launch_mode, 0) + 1
+                window_profile = item.get("windowProfile")
+                if window_profile not in ("OPAQUE", "TRANSLUCENT"):
+                    report.add(
+                        "BLOCKER",
+                        "activity-window-profile",
+                        f"Activity {item.get('className')!r} has invalid windowProfile {window_profile!r}",
+                        str(path),
+                    )
+                else:
+                    profiles[window_profile] = profiles.get(window_profile, 0) + 1
+                    capacity_key = f"{window_profile}/{launch_mode}"
+                    per_profile_mode[capacity_key] = per_profile_mode.get(capacity_key, 0) + 1
                 theme_key = item.get("themeKey")
                 if not isinstance(theme_key, str):
                     report.add(
@@ -242,9 +254,20 @@ def check_components(report: Report, path: Path, activity_jar: Path) -> None:
                     keyed += 1
                 else:
                     defaults += 1
-        for launch_mode, count in per_mode.items():
+        for capacity_key, count in per_profile_mode.items():
             if count > 8:
-                report.add("BLOCKER", "activity-capacity", f"{launch_mode} has {count} distinct entries; process capacity is 8", str(path))
+                report.add("BLOCKER", "activity-capacity", f"{capacity_key} has {count} distinct entries; process capacity is 8", str(path))
+        if not any(
+            item["code"] == "activity-window-profile" and item["severity"] == "BLOCKER"
+            for item in report.items
+        ):
+            summary = ", ".join(f"{name}={count}" for name, count in sorted(profiles.items()))
+            report.add(
+                "PASS",
+                "activity-window-profile",
+                f"Activity Window profiles are explicit and supported ({summary or 'none'})",
+                str(path),
+            )
         if not any(
             item["code"] == "activity-theme-key" and item["severity"] == "BLOCKER"
             for item in report.items

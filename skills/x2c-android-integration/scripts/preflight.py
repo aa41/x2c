@@ -253,17 +253,28 @@ def inspect_components(module_dir: Path) -> Dict[str, object]:
     combined = "\n".join(read_text(path) for path in source_files(module_dir, (".java", ".kt")))
     result: Dict[str, object] = {}
     activity_annotations = re.findall(r"@X2cPluginActivity(?:\s*\((.*?)\))?", combined, re.DOTALL)
-    modes: Dict[str, int] = {name: 0 for name in ("STANDARD", "SINGLE_TOP", "SINGLE_TASK", "SINGLE_INSTANCE")}
+    launch_modes = ("STANDARD", "SINGLE_TOP", "SINGLE_TASK", "SINGLE_INSTANCE")
+    profiles = ("OPAQUE", "TRANSLUCENT")
+    profile_modes: Dict[str, int] = {
+        f"{profile}/{mode}": 0 for profile in profiles for mode in launch_modes
+    }
     theme_keys: List[str] = []
     keyed_activities = 0
     for body in activity_annotations:
         match = re.search(r"PluginLaunchMode\.([A-Z_]+)", body)
-        modes[match.group(1) if match and match.group(1) in modes else "STANDARD"] += 1
+        launch_mode = match.group(1) if match and match.group(1) in launch_modes else "STANDARD"
+        profile_match = re.search(r"PluginWindowProfile\.([A-Z_]+)", body)
+        profile = (
+            profile_match.group(1)
+            if profile_match and profile_match.group(1) in profiles
+            else "OPAQUE"
+        )
+        profile_modes[f"{profile}/{launch_mode}"] += 1
         theme = re.search(r"\bthemeKey\s*=\s*[\"']([^\"']*)[\"']", body)
         if theme and theme.group(1):
             theme_keys.append(theme.group(1))
             keyed_activities += 1
-    result["activity_modes"] = modes
+    result["activity_profile_modes"] = profile_modes
     result["activities"] = len(activity_annotations)
     result["theme_keys"] = sorted(set(theme_keys))
     result["default_theme_activities"] = len(activity_annotations) - keyed_activities
@@ -374,9 +385,9 @@ def check_plugin_module(report: Report, root: Path, module_dir: Path, text: str)
         report.add("BLOCKER", "component-plugin", f"{total} annotated component(s) require dev.x2c.activity-plugin")
     elif total:
         report.add("PASS", "component-plugin", f"Component transform configured for {total} annotated entry/entries")
-    for launch_mode, count in dict(components["activity_modes"]).items():
+    for profile_mode, count in dict(components["activity_profile_modes"]).items():
         if count > 8:
-            report.add("BLOCKER", "activity-capacity", f"{launch_mode} declares {count} targets; process capacity is 8")
+            report.add("BLOCKER", "activity-capacity", f"{profile_mode} declares {count} targets; process capacity is 8")
     if int(components["services"]) > 8:
         report.add("BLOCKER", "service-capacity", f"Plugin declares {components['services']} Services; capacity is 8")
 
