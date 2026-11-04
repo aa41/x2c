@@ -28,8 +28,25 @@ val runtimeCoreTest by tasks.registering(JavaExec::class) {
     mainClass.set("dev.x2c.runtime.PluginHostConfigTest")
 }
 
+// Minimal Android doubles live outside every published source set. Exercise registration and
+// callback identity without executing the throwing methods in the compile-only android.jar.
+val compileLifecycleTest by tasks.registering(JavaCompile::class) {
+    dependsOn(tasks.classes)
+    source(layout.projectDirectory.dir("src/lifecycleTest/java"))
+    classpath = sourceSets.main.get().output
+    destinationDirectory.set(layout.buildDirectory.dir("lifecycle-test/classes"))
+}
+
+val runtimeLifecycleTest by tasks.registering(JavaExec::class) {
+    group = "verification"
+    dependsOn(compileLifecycleTest)
+    classpath = files(compileLifecycleTest.flatMap { it.destinationDirectory }) +
+        sourceSets.main.get().output
+    mainClass.set("dev.x2c.runtime.ActivityLifecycleRegistryTest")
+}
+
 tasks.check {
-    dependsOn(runtimeCoreTest)
+    dependsOn(runtimeCoreTest, runtimeLifecycleTest)
 }
 
 publishing {

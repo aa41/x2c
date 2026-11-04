@@ -9,10 +9,12 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Bundle;
 import dev.x2c.runtime.PluginThemeRegistry;
+import dev.x2c.runtime.X2cActivityLifecycle;
 
 /** Real framework Activity that owns the Window and forwards lifecycle to one plugin delegate. */
 @SuppressLint("MissingSuperCall") // The plugin root calls the matching superOn* method exactly once.
-public abstract class PluginContainerActivity extends Activity {
+public abstract class PluginContainerActivity extends Activity
+        implements X2cActivityLifecycle.ActivitySource {
     private PluginActivity pluginActivity;
     private boolean pluginThemeActive;
     private Resources.Theme bootstrapTheme;
@@ -21,7 +23,13 @@ public abstract class PluginContainerActivity extends Activity {
         activatePluginTheme(PluginActivityManager.resolveActivityTheme(
                 getIntent(), isTranslucentContainer()));
         pluginActivity = PluginActivityManager.createDelegate(this, getIntent());
+        X2cActivityLifecycle.dispatchPluginActivityPreCreated(this, savedInstanceState);
         pluginActivity.performCreate(savedInstanceState);
+    }
+
+    /** Stable business instance, including during native post-destroyed callbacks. */
+    @Override public final Activity getLifecycleActivity() {
+        return pluginActivity;
     }
 
     @Override public final Resources.Theme getTheme() {

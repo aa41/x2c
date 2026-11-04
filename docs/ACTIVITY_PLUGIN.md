@@ -151,6 +151,7 @@ window focus、user interaction/leave hint。
 - Intent/component、title、Application、task/orientation、finish/recreate/back、finish-on-touch-outside；
 - plugin 内/外 `startActivity` 和 `startActivityForResult`；
 - result、permission、UI thread、volume/media controller、window feature/progress/feature drawable final API。
+- 显式生命周期观察入口：`X2C.registerActivityLifecycleCallbacks(...)` / `unregisterActivityLifecycleCallbacks(...)`，普通 Activity 保持原对象，插件回调接收稳定业务 delegate；支持全局或定义加载器范围，API 29+ 包括 pre/post 回调。直接注册宿主 Application 的回调仍保持容器身份，具体边界见 [Application 契约](HOST_APPLICATION_CONTRACT.md#统一-activity-生命周期注册入口)。
 
 fixture 组件矩阵实际覆盖：宿主→插件、同插件普通显式 `Intent`、插件→插件 Result、跨两个
 `PluginClassLoader`、插件→宿主，以及 standard/singleTop/singleTask/singleInstance 与 `onNewIntent`。跨插件时使用

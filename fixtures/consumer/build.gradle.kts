@@ -118,8 +118,8 @@ val componentShowcaseComponentReport = layout.projectDirectory.file(
 )
 // These versions are part of the signed plugin identity. Increase the matching value whenever
 // that payload changes; SignedPluginInstaller intentionally rejects version reuse with new bytes.
-val layoutShowcaseVersionCode = 25L
-val componentShowcaseVersionCode = 23L
+val layoutShowcaseVersionCode = 26L
+val componentShowcaseVersionCode = 24L
 
 android {
     namespace = "dev.x2c.fixture.consumer"
@@ -161,7 +161,7 @@ androidComponents {
             payloadDirectoryName.set("x2c-layout-showcase")
             pluginId.set("dev.x2c.fixture.layout-showcase")
             versionCode.set(layoutShowcaseVersionCode)
-            versionName.set("25.0.0-host-theme-contract")
+            versionName.set("26.0.0-lifecycle-bridge")
             outputDirectory.set(layout.buildDirectory.dir(
                 "generated/x2cLayoutShowcaseAssets/${variant.name}",
             ))
@@ -179,7 +179,7 @@ androidComponents {
             payloadDirectoryName.set("x2c-component-showcase")
             pluginId.set("dev.x2c.fixture.component-showcase")
             versionCode.set(componentShowcaseVersionCode)
-            versionName.set("23.0.0-host-theme-contract")
+            versionName.set("24.0.0-lifecycle-bridge")
             outputDirectory.set(layout.buildDirectory.dir(
                 "generated/x2cComponentShowcaseAssets/${variant.name}",
             ))

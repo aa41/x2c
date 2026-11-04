@@ -37,6 +37,7 @@ public final class X2C {
     private static volatile ClassLoader hostClassLoader;
     private static volatile String hostPackageName;
     private static volatile SystemX2cResourceProvider systemResourceProvider;
+    private static ActivityLifecycleRegistry activityLifecycleRegistry;
 
     private X2C() {}
 
@@ -70,6 +71,7 @@ public final class X2C {
             hostPackageName = packageName;
             hostClassLoader = loader;
             systemResourceProvider = provider;
+            activityLifecycleRegistry = new ActivityLifecycleRegistry(candidate);
             // Publish last: readers that observe this volatile write also observe the host fields.
             applicationContext = candidate;
         }
@@ -86,6 +88,33 @@ public final class X2C {
     /** The single real Application shared by host and all JAR plugins. */
     public static Application hostApplication() {
         return (Application) requireContext();
+    }
+
+    /** Observes native Activities unchanged and plugin containers as their business delegates. */
+    public static void registerActivityLifecycleCallbacks(
+            Application.ActivityLifecycleCallbacks callback) {
+        X2cActivityLifecycle.registerActivityLifecycleCallbacks(callback);
+    }
+
+    /** Limits a plugin owner's callbacks to its defining loader; host owners observe globally. */
+    public static void registerActivityLifecycleCallbacks(
+            Class<?> ownerClass, Application.ActivityLifecycleCallbacks callback) {
+        X2cActivityLifecycle.registerActivityLifecycleCallbacks(ownerClass, callback);
+    }
+
+    public static void unregisterActivityLifecycleCallbacks(
+            Application.ActivityLifecycleCallbacks callback) {
+        X2cActivityLifecycle.unregisterActivityLifecycleCallbacks(callback);
+    }
+
+    public static void unregisterActivityLifecycleCallbacks(
+            Class<?> ownerClass, Application.ActivityLifecycleCallbacks callback) {
+        X2cActivityLifecycle.unregisterActivityLifecycleCallbacks(ownerClass, callback);
+    }
+
+    static ActivityLifecycleRegistry activityLifecycleRegistry() {
+        requireContext(); // Acquire the host initialization's volatile publication before reading.
+        return activityLifecycleRegistry;
     }
 
     /** Registers an external plugin's defining loader before module discovery. */
@@ -109,7 +138,9 @@ public final class X2C {
     }
 
     private static void verifyRuntimeIdentity(ClassLoader loader) {
-        for (Class<?> type : new Class<?>[] {X2C.class, X2cResources.class, X2cResourceProvider.class}) {
+        for (Class<?> type : new Class<?>[] {
+                X2C.class, X2cResources.class, X2cResourceProvider.class,
+                X2cActivityLifecycle.class, X2cActivityLifecycle.ActivitySource.class}) {
             try {
                 if (loader.loadClass(type.getName()) != type) {
                     throw new IllegalStateException("Duplicate X2C runtime type: " + type.getName());

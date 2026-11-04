@@ -94,6 +94,7 @@ python3 scripts/install-x2c-skill.py --tool codex --tool claude \
   `@X2cPluginBase` 从 `compileOnly project` 提取最小插件私有转换单元；未复制的
   analytics/账户/网络等业务依赖由 PluginClassLoader 自动回退到宿主 ClassLoader
 - 组件代理：四种 Activity launchMode、started/bound Service、normal/ordered Receiver、虚拟 ContentProvider 安全子集
+- 生命周期观察：通过 `X2C.registerActivityLifecycleCallbacks(...)` / `unregisterActivityLifecycleCallbacks(...)` 统一注册，普通 Activity 原样投递，插件容器映射为业务 delegate；支持定义加载器隔离及 API 29+ pre/post 回调，宿主原生注册不受影响，详见 [统一生命周期入口](docs/HOST_APPLICATION_CONTRACT.md#统一-activity-生命周期注册入口)。
 
 通用 View 属性覆盖：ID、宽高、weight、gravity、margin、padding、background/tint/foreground、visibility、enabled/click/focus、content description/tag/tooltip/transition、alpha/elevation/rotation/scale/translation/min size、layout direction、over-scroll 和常用 accessibility 属性。TextView 家族增加文本、hint、行数、字体样式、ellipsize、inputType/IME、compound drawable/padding；plugin 模式的 CDN bitmap 不能同步作为 compound drawable，normal 模式本地 bitmap 则通过系统 Resources 读取。ImageView 家族增加 src/scale/tint；CompoundButton、ProgressBar/SeekBar/RatingBar 也有对应 typed setter。
 
